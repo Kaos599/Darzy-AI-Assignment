@@ -99,7 +99,7 @@ You need a Google Gemini API key for the AI analysis features.
     ```
     GEMINI_API_KEY="YOUR_ACTUAL_GEMINI_API_KEY_HERE"
     ```
-    You can also optionally set `GEMINI_MODEL_NAME_VISION="your-preferred-gemini-vision-model"` if you want to override the default.
+    You can also optionally set `GEMINI_MODEL_NAME="your-preferred-gemini-vision-model"` if you want to override the default.
 The application (`main.py`) uses `python-dotenv` to load these variables. If `GEMINI_API_KEY` is not found, the application will prompt for it.
 
 ## Running the Application

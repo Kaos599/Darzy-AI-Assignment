@@ -486,7 +486,7 @@ def main_app():
         )
 
     # Gemini model name for vision analysis
-    GEMINI_MODEL_NAME = os.environ.get("GEMINI_MODEL_NAME_VISION", "gemini-pro-vision") # Default model
+    GEMINI_MODEL_NAME = os.environ.get("GEMINI_MODEL_NAME") 
 
     # --- File Upload Section ---
     uploaded_file = st.file_uploader(

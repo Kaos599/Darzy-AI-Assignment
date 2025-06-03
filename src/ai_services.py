@@ -113,7 +113,7 @@ Be precise with bounding boxes.
             bbox = item["bounding_box"]
             if not (isinstance(bbox, list) and len(bbox) == 4 and \
                     all(isinstance(n, (float, int)) and 0.0 <= n <= 1.0 for n in bbox) and \
-                    bbox[0] < bbox[2] and bbox[1] < bbox[3])):
+                    bbox[0] < bbox[2] and bbox[1] < bbox[3]):
                 print(f"WARNING: Item '{item.get('item_name', 'Unknown')}' has invalid bbox {bbox}. Skipping.")
                 continue
 

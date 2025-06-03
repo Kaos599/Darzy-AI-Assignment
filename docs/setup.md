@@ -75,7 +75,7 @@ The application requires a Google Gemini API key to interact with the AI model f
 *   **(Optional) Specify a Model Name:**
     You can also specify a particular Gemini vision model by adding another line to your `.env` file:
     ```env
-    GEMINI_MODEL_NAME_VISION="gemini-pro-vision" # Or your preferred compatible model
+    GEMINI_MODEL_NAME="gemini-pro-vision" # Or your preferred compatible model
     ```
     If this is not set, the application defaults to "gemini-pro-vision".
 

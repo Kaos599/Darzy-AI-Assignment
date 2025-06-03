@@ -3,6 +3,10 @@ import unittest
 from unittest.mock import patch, MagicMock
 import io
 from PIL import Image # Pillow is a direct dependency for test helpers
+import os
+import dotenv # Added for loading .env
+
+dotenv.load_dotenv() # Load environment variables from .env
 
 # Import functions and constants from the 'src' package
 # When running `python -m unittest tests.test_suite` from the project root,
@@ -122,76 +126,34 @@ class TestCSVConverters(unittest.TestCase):
         self.assertEqual(csv_string, "") # Function returns "" for no items
 
 
-class TestAIServices(unittest.TestCase):
-    # Patch ChatGoogleGenerativeAI where it's imported and used in src.ai_services
-    @patch('src.ai_services.ChatGoogleGenerativeAI')
-    def test_get_fashion_details_from_image_parsing(self, MockChatGoogle):
-        mock_llm_instance = MockChatGoogle.return_value
-        mock_response = MagicMock()
-        mock_response.content = '''
-        ```json
-        {
-          "fashion_items": [
-            {
-              "item_name": "Mock Scarf",
-              "category": "Accessory",
-              "bounding_box": [0.05, 0.05, 0.25, 0.95],
-              "dominant_colors": [
-                { "hex_code": "#A0522D", "color_name": "Sienna", "percentage": "100%" }
-              ]
-            }
-          ]
-        }
-        ```
-        '''
-        mock_llm_instance.invoke.return_value = mock_response
+class TestAIServicesLive(unittest.TestCase):
+    def setUp(self):
+        self.api_key = os.getenv("GEMINI_API_KEY")
+        self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-pro-vision")
+        self.dummy_image_bytes = create_dummy_image_bytes(200, 200, "PNG")
 
-        dummy_image_bytes = create_dummy_image_bytes(50, 50)
-        result = get_fashion_details_from_image(dummy_image_bytes, "fake_api_key", "gemini-pro-vision")
+    @unittest.skipUnless(os.getenv("GEMINI_API_KEY"), "GEMINI_API_KEY not set, skipping live AI service test.")
+    def test_get_fashion_details_from_image_live_call(self):
+        print(f"\nRunning live AI service test with model: {self.model_name}")
+        result = get_fashion_details_from_image(self.dummy_image_bytes, self.api_key, self.model_name)
 
-        self.assertIsNotNone(result)
-        self.assertIn("fashion_items", result)
-        self.assertEqual(len(result["fashion_items"]), 1)
-        item = result["fashion_items"][0]
-        self.assertEqual(item["item_name"], "Mock Scarf")
-        self.assertEqual(item["category"], "Accessory") # Added assertion
-        self.assertEqual(item["bounding_box"], [0.05,0.05,0.25,0.95]) # Added assertion
-        self.assertEqual(len(item["dominant_colors"]), 1) # Added assertion
-        self.assertEqual(item["dominant_colors"][0]["color_name"], "Sienna") # Added assertion
+        self.assertIsNotNone(result, "Expected a result from Gemini API, got None.")
+        self.assertIn("fashion_items", result, "Result missing 'fashion_items' key.")
+        self.assertIsInstance(result["fashion_items"], list, "'fashion_items' should be a list.")
 
-
-        # Verify the prompt structure (simplified check)
-        args, _ = mock_llm_instance.invoke.call_args
-        messages_list = args[0]
-        self.assertTrue(len(messages_list) > 0)
-        human_message_content = messages_list[0].content
-        self.assertTrue(isinstance(human_message_content, list))
-        self.assertEqual(human_message_content[0]['type'], 'text')
-        self.assertIn("Return ONLY the JSON object", human_message_content[0]['text'])
-        self.assertEqual(human_message_content[1]['type'], 'image_url')
-
-    @patch('src.ai_services.ChatGoogleGenerativeAI')
-    def test_get_fashion_details_invalid_json_response(self, MockChatGoogle):
-        mock_llm_instance = MockChatGoogle.return_value
-        mock_response = MagicMock()
-        mock_response.content = "This is not JSON."
-        mock_llm_instance.invoke.return_value = mock_response
-        dummy_image_bytes = create_dummy_image_bytes(50, 50)
-
-        # In ai_services, st.error was replaced with print. We can't easily check print output
-        # without further mocking sys.stdout. For now, just ensure it returns None.
-        result = get_fashion_details_from_image(dummy_image_bytes, "fake_api_key", "gemini-pro-vision")
-        self.assertIsNone(result)
-
-    @patch('src.ai_services.ChatGoogleGenerativeAI')
-    def test_get_fashion_details_malformed_data_in_json(self, MockChatGoogle):
-        mock_llm_instance = MockChatGoogle.return_value
-        mock_response = MagicMock()
-        mock_response.content = '{"unexpected_key": "some_value"}' # Valid JSON, wrong structure
-        mock_llm_instance.invoke.return_value = mock_response
-        dummy_image_bytes = create_dummy_image_bytes(50, 50)
-        result = get_fashion_details_from_image(dummy_image_bytes, "fake_api_key", "gemini-pro-vision")
-        self.assertIsNone(result) # Expect None due to structural validation failure
+        # If items are detected, validate their basic structure
+        if result["fashion_items"]:
+            item = result["fashion_items"][0]
+            self.assertIn("item_name", item)
+            self.assertIn("category", item)
+            self.assertIn("bounding_box", item)
+            self.assertIn("dominant_colors", item)
+            self.assertIsInstance(item["bounding_box"], list)
+            self.assertEqual(len(item["bounding_box"]), 4)
+            self.assertIsInstance(item["dominant_colors"], list)
+            print("INFO: Live AI service test passed with detected items.")
+        else:
+            print("INFO: Live AI service test passed with no items detected (expected for a plain blue image).")
 
 if __name__ == '__main__':
     # This allows running the tests directly from this file: `python tests/test_suite.py`

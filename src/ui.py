@@ -39,7 +39,7 @@ def display_app():
             help="Required for AI analysis. Store as GEMINI_API_KEY in a .env file or Colab secret."
         )
 
-    GEMINI_MODEL_NAME = os.environ.get("GEMINI_MODEL_NAME_VISION", "gemini-pro-vision")
+    GEMINI_MODEL_NAME = os.environ.get("GEMINI_MODEL_NAME", "gemini-pro-vision")
 
     uploaded_file = st.file_uploader(
         "1. Upload Fashion Image",
