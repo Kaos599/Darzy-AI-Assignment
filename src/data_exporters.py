@@ -23,7 +23,7 @@ def convert_fashion_details_to_csv(analysis_data: dict, max_colors_per_item: int
         return ""
 
     output = io.StringIO()
-    base_fieldnames = ["item_name", "category", "bbox_ymin", "bbox_xmin", "bbox_ymax", "bbox_xmax"]
+    base_fieldnames = ["item_name", "category", "fabric_type", "fabric_confidence_score", "bbox_ymin", "bbox_xmin", "bbox_ymax", "bbox_xmax"]
     color_fieldnames = []
     for i in range(max_colors_per_item):
         color_fieldnames.extend([f"color_{i+1}_name", f"color_{i+1}_hex", f"color_{i+1}_percentage"])
@@ -41,6 +41,8 @@ def convert_fashion_details_to_csv(analysis_data: dict, max_colors_per_item: int
         row = {
             "item_name": item.get("item_name", ""),
             "category": item.get("category", ""),
+            "fabric_type": item.get("fabric_type", ""),
+            "fabric_confidence_score": item.get("fabric_confidence_score", ""),
             "bbox_ymin": bbox_list[0] if len(bbox_list) == 4 else "",
             "bbox_xmin": bbox_list[1] if len(bbox_list) == 4 else "",
             "bbox_ymax": bbox_list[2] if len(bbox_list) == 4 else "",

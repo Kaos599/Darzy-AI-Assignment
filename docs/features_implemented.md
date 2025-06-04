@@ -43,30 +43,46 @@ As part of the fashion item detection, the AI also analyzes the dominant colors 
     *   **Color Name:** A common, human-readable name for the color (e.g., "Crimson Red", "Forest Green").
     *   **Percentage:** An estimated percentage representing how much of that color is present on that specific item (e.g., "70%").
 
-## 5. Annotated Image Display
+## 5. Per-Item Fabric Analysis
+
+Following the item detection, the AI also analyzes the most likely fabric type for *each individual detected item*:
+
+*   **Fabric Details:** For each item, the AI provides:
+    *   **Fabric Type:** The most probable fabric (e.g., `Cotton`, `Denim`, `Wool`, `Silk`, `Polyester`, `Leather`, `Blend`, `Unknown`).
+    *   **Confidence Score:** A numerical score (0.0 to 1.0) indicating the AI's confidence in the detected fabric type.
+
+## 6. Annotated Image Display
 
 *   **Visual Feedback:** After successful AI analysis, the processed image is displayed again, but this time with annotations.
 *   **Bounding Boxes:** Rectangular boxes are drawn around each detected fashion item based on the coordinates provided by the AI.
 *   **Labels:** Each bounding box is accompanied by a text label displaying the item's name and category (e.g., "T-shirt (Topwear)").
 *   **Color Coding:** The color of the bounding box and its label background often corresponds to one of the dominant colors of the item itself, providing a quick visual link.
 
-## 6. Detailed Results Display
+## 7. Detailed Results Display
 
 *   **Structured Information:** Below the annotated image, details for each detected fashion item are presented in a structured and expandable format using Streamlit's `st.expander`.
 *   **Per-Item View:** Each expander section is dedicated to one item and shows:
     *   The item's name and category.
     *   A visual representation of its dominant colors using `st.color_picker` swatches (disabled, for display only), along with their names and percentages.
+    *   **Fabric Details:** The detected fabric type and its confidence score.
 
-## 7. Data Export
+## 8. Data Export
 
 Users can download the detailed analysis results:
 
 *   **JSON Export:**
     *   Provides the complete, structured data returned by the AI for all detected fashion items.
-    *   This includes item names, categories, bounding boxes, and the full list of dominant colors (with hex, name, percentage) for each item.
+    *   This includes item names, categories, bounding boxes, and the full list of dominant colors (with hex, name, percentage), and now `fabric_type` and `fabric_confidence_score` for each item.
     *   The file is named based on the original uploaded image filename (e.g., `myimage_fashion_details.json`).
 *   **CSV Export:**
     *   Provides a flattened, tabular representation of the fashion item details.
     *   Each row corresponds to a detected item.
-    *   Columns include: `item_name`, `category`, bounding box coordinates (`bbox_ymin`, `bbox_xmin`, `bbox_ymax`, `bbox_xmax`), and details for up to 3 dominant colors per item (e.g., `color_1_name`, `color_1_hex`, `color_1_percentage`, `color_2_name`, etc.).
+    *   Columns include: `item_name`, `category`, `fabric_type`, `fabric_confidence_score`, bounding box coordinates (`bbox_ymin`, `bbox_xmin`, `bbox_ymax`, `bbox_xmax`), and details for up to 3 dominant colors per item (e.g., `color_1_name`, `color_1_hex`, `color_1_percentage`, `color_2_name`, etc.).
     *   The file is named based on the original uploaded image filename (e.g., `myimage_fashion_details.csv`).
+
+## 9. Smart Recommendations
+
+Leveraging the AI's understanding of fashion items, colors, and fabrics, the tool now provides overall styling advice for the detected ensemble:
+
+*   **Styling Suggestions:** A textual recommendation on how to style the detected items, including complementary colors, general outfit suggestions, and consideration for fabric types and colors.
+*   **Integration:** This recommendation is displayed prominently in the UI and included in the JSON export.

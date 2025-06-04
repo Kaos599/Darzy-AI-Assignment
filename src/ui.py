@@ -2,7 +2,7 @@
 
 import streamlit as st
 import os
-# import traceback # Keep commented unless specific debugging is needed in UI
+import traceback
 
 from .constants import MAX_IMAGE_SIZE, JPEG_QUALITY, TARGET_FORMAT, DEFAULT_FONT_SIZE
 from .image_utils import process_image, draw_detections_on_image
@@ -10,7 +10,7 @@ from .ai_services import get_fashion_details_from_image, LANGCHAIN_AVAILABLE
 from .data_exporters import convert_fashion_details_to_csv, export_to_json_string
 
 def display_app():
-    # Renders the Streamlit User Interface and orchestrates the application flow.
+    """Renders the Streamlit User Interface and orchestrates the application flow."""
     st.set_page_config(page_title="AI Fashion Analysis Pro", layout="wide")
     st.title("AI Fashion Analysis Pro 🧥🎨")
     st.markdown(
@@ -18,19 +18,29 @@ def display_app():
         "This refactored version provides detailed per-item analysis."
     )
 
+    # Initialize all session state variables at the top of the function
+    if 'GEMINI_API_KEY' not in st.session_state:
+        st.session_state.GEMINI_API_KEY = None
+    if 'uploaded_fashion_filename_ui' not in st.session_state:
+        st.session_state.uploaded_fashion_filename_ui = None
+    if 'processed_fashion_image_bytes_ui' not in st.session_state:
+        st.session_state.processed_fashion_image_bytes_ui = None
+    if 'fashion_analysis_results_ui' not in st.session_state:
+        st.session_state.fashion_analysis_results_ui = None
+    if 'annotated_image_bytes_ui' not in st.session_state:
+        st.session_state.annotated_image_bytes_ui = None
+
     if not LANGCHAIN_AVAILABLE:
         st.error("Core AI libraries (langchain-google-genai) are not installed or configured correctly. "
                  "Please ensure dependencies are installed. AI features will be disabled.")
 
-    if 'GEMINI_API_KEY' not in st.session_state:
-        st.session_state.GEMINI_API_KEY = None
-        try:
-            from google.colab import userdata
-            st.session_state.GEMINI_API_KEY = userdata.get('GEMINI_API_KEY')
-        except (ImportError, ModuleNotFoundError): # Not in Colab or google module not found
-            pass
-        if not st.session_state.GEMINI_API_KEY:
-            st.session_state.GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+    try:
+        from google.colab import userdata
+        st.session_state.GEMINI_API_KEY = userdata.get('GEMINI_API_KEY')
+    except (ImportError, ModuleNotFoundError):
+        pass
+    if not st.session_state.GEMINI_API_KEY:
+        st.session_state.GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
     if not st.session_state.GEMINI_API_KEY:
         st.session_state.GEMINI_API_KEY = st.text_input(
@@ -47,18 +57,13 @@ def display_app():
         key="file_uploader_main_ui"
     )
 
-    session_keys_to_init = ['uploaded_fashion_filename_ui', 'processed_fashion_image_bytes_ui',
-                            'fashion_analysis_results_ui', 'annotated_image_bytes_ui']
-    for key in session_keys_to_init:
-        if key not in st.session_state:
-            st.session_state[key] = None
-
     if uploaded_file is not None:
         if st.session_state.get('uploaded_fashion_filename_ui') != uploaded_file.name:
             st.session_state.uploaded_fashion_filename_ui = uploaded_file.name
-            for key in session_keys_to_init:
-                st.session_state[key] = None
-            # st.info("New image uploaded. Ready for processing and analysis.") # Can be a bit noisy
+            st.session_state.processed_fashion_image_bytes_ui = None
+            st.session_state.fashion_analysis_results_ui = None
+            st.session_state.annotated_image_bytes_ui = None
+            st.info("New image uploaded. Ready for processing and analysis.")
 
         if not st.session_state.processed_fashion_image_bytes_ui:
             raw_image_bytes = uploaded_file.getvalue()
@@ -72,7 +77,7 @@ def display_app():
                 st.error(f"Image processing failed: {p_msg}")
                 st.session_state.uploaded_fashion_filename_ui = None
                 st.session_state.processed_fashion_image_bytes_ui = None
-                # Allow UI to stay interactive
+                return
 
         if st.session_state.processed_fashion_image_bytes_ui:
             if not LANGCHAIN_AVAILABLE:
@@ -108,8 +113,10 @@ def display_app():
                     else:
                         st.error("AI analysis failed. Check logs or try a different image/API key.")
     else:
-        for key in session_keys_to_init:
-            st.session_state.pop(key, None)
+        st.session_state.uploaded_fashion_filename_ui = None
+        st.session_state.processed_fashion_image_bytes_ui = None
+        st.session_state.fashion_analysis_results_ui = None
+        st.session_state.annotated_image_bytes_ui = None
         st.info("👋 Welcome! Please upload an image to begin the AI Fashion Analysis.")
 
     if st.session_state.annotated_image_bytes_ui:
@@ -125,6 +132,14 @@ def display_app():
         for i, item in enumerate(results["fashion_items"]):
             with st.expander(f"Item {i+1}: {item.get('item_name', 'N/A')} ({item.get('category', 'N/A')})", expanded=True):
                 st.markdown(f"**Category:** {item.get('category', 'N/A')}")
+
+                fabric_type = item.get('fabric_type', 'N/A')
+                fabric_confidence = item.get('fabric_confidence_score')
+                if fabric_type != 'N/A':
+                    confidence_str = f" ({fabric_confidence:.2f} confidence)" if isinstance(fabric_confidence, (float, int)) else ""
+                    st.markdown(f"**Fabric Type:** {fabric_type}{confidence_str}")
+                else:
+                    st.markdown("**Fabric Type:** Not detected")
 
                 st.markdown("**Dominant Colors (for this item):**")
                 item_dominant_colors = item.get("dominant_colors", [])
@@ -148,6 +163,13 @@ def display_app():
                             )
                 else:
                     st.write("No dominant colors were specified for this item by the AI.")
+
+            styling_recommendation = item.get("styling_recommendation", "")
+            if styling_recommendation:
+                st.subheader("💡 Styling Recommendation")
+                st.markdown(styling_recommendation)
+            else:
+                st.info("No specific styling recommendation was provided by the AI.")
 
         st.subheader("💾 3. Download Full Analysis")
         base_fn = st.session_state.get('uploaded_fashion_filename_ui', 'fashion_analysis').rsplit('.', 1)[0]
@@ -180,6 +202,13 @@ def display_app():
          not st.session_state.fashion_analysis_results_ui.get("fashion_items") and \
          st.session_state.get('uploaded_fashion_filename_ui'):
         st.info("AI analysis completed, but no fashion items were identified in the image to display details for.")
+        results = st.session_state.fashion_analysis_results_ui
+        styling_recommendation = results.get("styling_recommendation", "")
+        if styling_recommendation:
+            st.subheader("💡 Styling Recommendation")
+            st.markdown(styling_recommendation)
+        else:
+            st.info("No specific styling recommendation was provided by the AI.")
 
 # Note: No `if __name__ == '__main__':` block here.
 # This module is intended to be imported and display_app() called by main.py.

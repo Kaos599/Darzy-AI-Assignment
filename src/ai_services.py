@@ -30,8 +30,7 @@ def get_fashion_details_from_image(image_bytes: bytes, api_key: str, model_name:
         encoded_image_base64 = base64.b64encode(image_bytes).decode('utf-8')
         image_mime_type = f"image/{TARGET_FORMAT.lower()}"
 
-        prompt_text = f"""Analyze the provided image to identify all distinct fashion items.
-For EACH detected fashion item, provide the following details:
+        prompt_text = f"""Analyze the provided image to identify all distinct fashion items. For EACH detected fashion item, provide the following details:
 1.  "item_name": A concise name for the item (e.g., "T-shirt", "Blue Jeans", "Leather Handbag", "Sneakers").
 2.  "category": A general category for the item (e.g., "Topwear", "Bottomwear", "Footwear", "Accessory", "Outerwear", "Full Body").
 3.  "bounding_box": Normalized bounding box coordinates [ymin, xmin, ymax, xmax], where values are between 0.0 and 1.0. Ensure ymin < ymax and xmin < xmax.
@@ -39,10 +38,14 @@ For EACH detected fashion item, provide the following details:
     *   "hex_code": The HEX code (e.g., "#RRGGBB").
     *   "color_name": A common name for the color (e.g., "Navy Blue").
     *   "percentage": Estimated percentage of this color ON THIS ITEM (e.g., "70%").
+5.  "fabric_type": The most likely fabric type (e.g., "Cotton", "Denim", "Wool", "Silk", "Polyester", "Leather", "Blend", "Unknown").
+6.  "fabric_confidence_score": A confidence score for the fabric type, between 0.0 (low confidence) and 1.0 (high confidence).
+
+Additionally, provide an overall "styling_recommendation" for the detected fashion items. This recommendation should be a general textual advice on how to style the detected items, suggesting complementary colors or general outfit suggestions, keeping in mind the detected fabric types and colors.
 
 Return ONLY the JSON object as your response, starting with {{ and ending with }}.
-The JSON object must have a single key "fashion_items", which is a list of objects.
-Each object in the list represents a detected fashion item and must contain all keys: "item_name", "category", "bounding_box", and "dominant_colors".
+The JSON object must have a top-level key "fashion_items", which is a list of objects, and a top-level key "styling_recommendation", which is a string.
+Each object in the "fashion_items" list represents a detected fashion item and must contain all keys: "item_name", "category", "bounding_box", "dominant_colors", "fabric_type", and "fabric_confidence_score".
 
 Example of the expected JSON structure:
 {{
@@ -54,13 +57,16 @@ Example of the expected JSON structure:
       "dominant_colors": [
         {{ "hex_code": "#FF0000", "color_name": "Red", "percentage": "90%" }},
         {{ "hex_code": "#FFFFFF", "color_name": "White", "percentage": "10%" }}
-      ]
+      ],
+      "fabric_type": "Cotton",
+      "fabric_confidence_score": 0.95
     }}
-  ]
+  ],
+  "styling_recommendation": "This red cotton t-shirt would pair well with dark wash denim jeans and white sneakers for a casual look. For a slightly more dressed-up feel, consider layering with a light gray cardigan."
 }}
-If no fashion items are detected, return an empty list for "fashion_items": {{"fashion_items": []}}.
+If no fashion items are detected, return an empty list for "fashion_items": {{"fashion_items": []}} and an empty string for "styling_recommendation": "".
 Focus only on actual clothing, shoes, and significant accessories. Ignore background elements.
-Be precise with bounding boxes.
+Be precise with bounding boxes and analyze the image thoroughly for fabric details and provide relevant styling advice.
 """
         message = HumanMessage(
             content=[
@@ -100,13 +106,14 @@ Be precise with bounding boxes.
             return None
 
         if not isinstance(analysis_data, dict) or "fashion_items" not in analysis_data or \
-           not isinstance(analysis_data["fashion_items"], list):
+           not isinstance(analysis_data["fashion_items"], list) or "styling_recommendation" not in analysis_data or \
+           not isinstance(analysis_data["styling_recommendation"], str):
             print(f"ERROR: AI response JSON structure is invalid. Data: {analysis_data}")
             return None
 
         validated_items = []
         for item_idx, item in enumerate(analysis_data.get("fashion_items", [])):
-            if not isinstance(item, dict) or not all(k in item for k in ["item_name", "category", "bounding_box", "dominant_colors"]):
+            if not isinstance(item, dict) or not all(k in item for k in ["item_name", "category", "bounding_box", "dominant_colors", "fabric_type", "fabric_confidence_score"]):
                 print(f"WARNING: Item {item_idx} missing required fields. Skipping. Item data: {item}")
                 continue
 
@@ -130,7 +137,8 @@ Be precise with bounding boxes.
             item["dominant_colors"] = valid_colors_for_item
             validated_items.append(item)
 
-        return {"fashion_items": validated_items}
+        analysis_data["fashion_items"] = validated_items
+        return analysis_data
 
     except Exception as e:
         print(f"ERROR: An unexpected error occurred in get_fashion_details_from_image: {e}")

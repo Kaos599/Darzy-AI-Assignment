@@ -18,6 +18,7 @@ from src.constants import MAX_IMAGE_SIZE, JPEG_QUALITY, TARGET_FORMAT # Removed 
 
 # Helper to create a dummy image (same as before)
 def create_dummy_image_bytes(width, height, img_format="PNG", mode="RGB"):
+    """Create a dummy image for testing purposes."""
     img = Image.new(mode, (width, height), color="blue")
     # Handle potential conversion if mode and format are incompatible for save
     if mode == "RGBA" and img_format == "JPEG":
@@ -102,23 +103,27 @@ class TestCSVConverters(unittest.TestCase):
                     "dominant_colors": [
                         {"color_name": "Green", "hex_code": "#00FF00", "percentage": "80%"},
                         {"color_name": "White", "hex_code": "#FFFFFF", "percentage": "20%"}
-                    ]
+                    ],
+                    "fabric_type": "Cotton",
+                    "fabric_confidence_score": 0.9
                 },
                 {
                     "item_name": "Test Pants", "category": "Bottom",
                     "bounding_box": [0.5, 0.1, 0.9, 0.5], # Valid bbox
                     "dominant_colors": [
                         {"color_name": "Black", "hex_code": "#000000", "percentage": "100%"}
-                    ]
+                    ],
+                    "fabric_type": "Denim",
+                    "fabric_confidence_score": 0.85
                 }
             ]
         }
         csv_string = convert_fashion_details_to_csv(sample_data, max_colors_per_item=2)
-        expected_header = "item_name,category,bbox_ymin,bbox_xmin,bbox_ymax,bbox_xmax,color_1_name,color_1_hex,color_1_percentage,color_2_name,color_2_hex,color_2_percentage"
+        expected_header = "item_name,category,fabric_type,fabric_confidence_score,bbox_ymin,bbox_xmin,bbox_ymax,bbox_xmax,color_1_name,color_1_hex,color_1_percentage,color_2_name,color_2_hex,color_2_percentage"
         self.assertTrue(csv_string.startswith(expected_header))
-        self.assertIn("Test Shirt,Top,0.1,0.1,0.5,0.5,Green,#00FF00,80%,White,#FFFFFF,20%", csv_string)
+        self.assertIn("Test Shirt,Top,Cotton,0.9,0.1,0.1,0.5,0.5,Green,#00FF00,80%,White,#FFFFFF,20%", csv_string)
         # For Test Pants, color_2 fields should be empty as per _flatten_colors_for_csv logic
-        self.assertIn("Test Pants,Bottom,0.5,0.1,0.9,0.5,Black,#000000,100%,,,", csv_string)
+        self.assertIn("Test Pants,Bottom,Denim,0.85,0.5,0.1,0.9,0.5,Black,#000000,100%,,,", csv_string)
 
 
     def test_convert_empty_fashion_details_to_csv(self):
@@ -141,19 +146,67 @@ class TestAIServicesLive(unittest.TestCase):
         self.assertIn("fashion_items", result, "Result missing 'fashion_items' key.")
         self.assertIsInstance(result["fashion_items"], list, "'fashion_items' should be a list.")
 
-        # If items are detected, validate their basic structure
+        # If items are detected, validate their basic structure (now including fabric)
         if result["fashion_items"]:
             item = result["fashion_items"][0]
             self.assertIn("item_name", item)
             self.assertIn("category", item)
             self.assertIn("bounding_box", item)
             self.assertIn("dominant_colors", item)
+            self.assertIn("fabric_type", item)
+            self.assertIn("fabric_confidence_score", item)
             self.assertIsInstance(item["bounding_box"], list)
             self.assertEqual(len(item["bounding_box"]), 4)
             self.assertIsInstance(item["dominant_colors"], list)
-            print("INFO: Live AI service test passed with detected items.")
+            self.assertIsInstance(item["fabric_confidence_score"], (float, int))
+            self.assertTrue(0.0 <= item["fabric_confidence_score"] <= 1.0)
+            print("INFO: Live AI service test passed with detected items including fabric details.")
         else:
-            print("INFO: Live AI service test passed with no items detected (expected for a plain blue image).")
+            print("INFO: Live AI service test passed with no items detected (expected for a plain blue image). If this was not expected, check the dummy image). ")
+
+    @unittest.skipUnless(os.getenv("GEMINI_API_KEY"), "GEMINI_API_KEY not set, skipping live AI service test.")
+    def test_end_to_end_fabric_analysis_silk_shirt(self):
+        print("\nRunning end-to-end fabric analysis test with silk_shirt.png...")
+        image_path = "assets/silk_shirt.png"
+        try:
+            with open(image_path, "rb") as f:
+                image_bytes = f.read()
+        except FileNotFoundError:
+            self.fail(f"Test image not found at {image_path}. Please ensure it exists.")
+
+        # 1. Process image
+        processed_bytes, processed_filename, msg = process_image(image_bytes, os.path.basename(image_path))
+        self.assertIsNotNone(processed_bytes, f"Image processing failed for {image_path}: {msg}")
+
+        # 2. Get AI analysis
+        analysis_data = get_fashion_details_from_image(processed_bytes, self.api_key, self.model_name)
+        self.assertIsNotNone(analysis_data, "AI analysis returned None.")
+        self.assertIn("fashion_items", analysis_data)
+        self.assertIsInstance(analysis_data["fashion_items"], list)
+        self.assertTrue(len(analysis_data["fashion_items"]) > 0, "No fashion items detected for silk_shirt.png.")
+
+        # 3. Validate fabric analysis for at least one item
+        found_fabric_details = False
+        for item in analysis_data["fashion_items"]:
+            self.assertIn("item_name", item)
+            self.assertIn("category", item)
+            self.assertIn("bounding_box", item)
+            self.assertIn("dominant_colors", item)
+            self.assertIn("fabric_type", item)
+            self.assertIn("fabric_confidence_score", item)
+
+            if item.get("fabric_type") and isinstance(item.get("fabric_confidence_score"), (float, int)):
+                self.assertTrue(0.0 <= item["fabric_confidence_score"] <= 1.0)
+                print(f"  Detected fabric: {item["fabric_type"]} with confidence {item["fabric_confidence_score"]:.2f} for {item["item_name"]}")
+                found_fabric_details = True
+        self.assertTrue(found_fabric_details, "No item in silk_shirt.png analysis contained valid fabric details.")
+
+        # 4. Validate CSV export includes new fields
+        csv_string = convert_fashion_details_to_csv(analysis_data)
+        self.assertIn("fabric_type", csv_string)
+        self.assertIn("fabric_confidence_score", csv_string)
+        print("  CSV export verified to include fabric details.")
+        print("End-to-end fabric analysis test (silk_shirt.png) passed.")
 
 if __name__ == '__main__':
     # This allows running the tests directly from this file: `python tests/test_suite.py`
