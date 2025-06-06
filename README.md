@@ -26,6 +26,9 @@ This project is structured into multiple Python files for better organization an
 *   **Data Export:**
     *   Download the complete, structured analysis results for all detected items as a **JSON** file.
     *   Download a summary of detected items and their key features (including flattened color data) as a **CSV** file.
+*   **AI Size Estimation:** Suggests potential sizes for garments in the image with reasoning.
+*   **AI Fashion Copywriter:** Generates product descriptions, styling tips, and social media captions.
+*   **Smart Recommendations:** Provides suggestions for complementary items/colors, similar styles, and seasonal advice based on detected items.
 
 ## Project Structure
 
@@ -99,7 +102,7 @@ You need a Google Gemini API key for the AI analysis features.
     ```
     GEMINI_API_KEY="YOUR_ACTUAL_GEMINI_API_KEY_HERE"
     ```
-    You can also optionally set `GEMINI_MODEL_NAME="your-preferred-gemini-vision-model"` if you want to override the default.
+    You can also optionally set `GEMINI_MODEL_NAME_VISION="your-preferred-gemini-vision-model"` if you want to override the default.
 The application (`main.py`) uses `python-dotenv` to load these variables. If `GEMINI_API_KEY` is not found, the application will prompt for it.
 
 ## Running the Application
