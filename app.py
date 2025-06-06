@@ -441,6 +441,17 @@ def main_app():
 
     GEMINI_MODEL_NAME = os.environ.get("GEMINI_MODEL_NAME")
 
+    if 'uploaded_fashion_filename' not in st.session_state:
+        st.session_state.uploaded_fashion_filename = None
+    if 'processed_fashion_image_bytes' not in st.session_state:
+        st.session_state.processed_fashion_image_bytes = None
+    if 'fashion_analysis_results' not in st.session_state:
+        st.session_state.fashion_analysis_results = None
+    if 'annotated_image_bytes' not in st.session_state:
+        st.session_state.annotated_image_bytes = None
+    if 'smart_recommendations_results' not in st.session_state:
+        st.session_state.smart_recommendations_results = None
+
     # --- File Upload Section ---
     uploaded_file = st.file_uploader(
         "1. Upload Fashion Image",
@@ -448,17 +459,15 @@ def main_app():
         key="file_uploader_main"
     )
 
-    session_keys_to_init = ['uploaded_fashion_filename', 'processed_fashion_image_bytes',
-                            'fashion_analysis_results', 'annotated_image_bytes']
-    for key in session_keys_to_init:
-        if key not in st.session_state:
-            st.session_state[key] = None
-
     if uploaded_file is not None:
-        if st.session_state.get('uploaded_fashion_filename') != uploaded_file.name:
+        # Check if a new file has been uploaded or if the existing one was cleared
+        if st.session_state.uploaded_fashion_filename != uploaded_file.name:
+            # New file uploaded, clear previous analysis results
             st.session_state.uploaded_fashion_filename = uploaded_file.name
-            for key in session_keys_to_init:
-                st.session_state[key] = None
+            st.session_state.processed_fashion_image_bytes = None
+            st.session_state.fashion_analysis_results = None
+            st.session_state.annotated_image_bytes = None
+            st.session_state.smart_recommendations_results = None # Clear recommendations too
             st.info("New image uploaded. Ready for processing and analysis.")
 
         if not st.session_state.processed_fashion_image_bytes:
@@ -471,46 +480,57 @@ def main_app():
                 st.image(p_img_data, caption=f"Processed Image Preview ({p_msg})", use_column_width=True)
             else:
                 st.error(f"Image processing failed: {p_msg}")
+                # Clear state if processing failed
                 st.session_state.uploaded_fashion_filename = None
                 st.session_state.processed_fashion_image_bytes = None
+                st.session_state.fashion_analysis_results = None
+                st.session_state.annotated_image_bytes = None
+                st.session_state.smart_recommendations_results = None
                 return
 
-        if st.session_state.processed_fashion_image_bytes:
-            if not st.session_state.GEMINI_API_KEY:
-                st.warning("Please enter your Gemini API Key above to enable the AI-powered analysis features.")
-            else:
-                if st.button("2. Analyze Fashion Details with AI ✨", key="analyze_fashion_button"):
-                    st.session_state.fashion_analysis_results = None
-                    st.session_state.annotated_image_bytes = None
+        # This block contains the buttons for AI analysis
+        if st.session_state.processed_fashion_image_bytes and st.session_state.GEMINI_API_KEY:
+            # Place the analysis button here, as it depends on processed image
+            if st.button("2. Analyze Fashion Details with AI ✨", key="analyze_fashion_button"):
+                st.session_state.fashion_analysis_results = None
+                st.session_state.annotated_image_bytes = None
+                st.session_state.smart_recommendations_results = None # Clear old recommendations on new analysis
 
-                    analysis_data = get_fashion_details_from_image(
-                        st.session_state.processed_fashion_image_bytes,
-                        st.session_state.GEMINI_API_KEY,
-                        GEMINI_MODEL_NAME
-                    )
+                analysis_data = get_fashion_details_from_image(
+                    st.session_state.processed_fashion_image_bytes,
+                    st.session_state.GEMINI_API_KEY,
+                    GEMINI_MODEL_NAME
+                )
 
-                    if analysis_data:
-                        st.session_state.fashion_analysis_results = analysis_data
-                        if analysis_data.get("fashion_items"):
-                            st.success("Fashion analysis complete! Items detected.")
-                            with st.spinner("🎨 Generating annotated image with detected items..."):
-                                annotated_bytes = draw_detections_on_image(
-                                    st.session_state.processed_fashion_image_bytes,
-                                    analysis_data
-                                )
-                            if annotated_bytes:
-                                st.session_state.annotated_image_bytes = annotated_bytes
-                            else:
-                                st.warning("Could not generate the annotated image, but analysis data is available below.")
+                if analysis_data:
+                    st.session_state.fashion_analysis_results = analysis_data
+                    if analysis_data.get("fashion_items"):
+                        st.success("Fashion analysis complete! Items detected.")
+                        with st.spinner("🎨 Generating annotated image with detected items..."):
+                            annotated_bytes = draw_detections_on_image(
+                                st.session_state.processed_fashion_image_bytes,
+                                analysis_data
+                            )
+                        if annotated_bytes:
+                            st.session_state.annotated_image_bytes = annotated_bytes
                         else:
-                            st.info("AI analysis ran successfully, but no specific fashion items were detected or validated in this image.")
-
+                            st.warning("Could not generate the annotated image, but analysis data is available below.")
+                    else:
+                        st.info("AI analysis ran successfully, but no specific fashion items were detected or validated in this image.")
     else:
-        for key in session_keys_to_init:
-            st.session_state.pop(key, None)
-        st.info("👋 Welcome! Please upload an image to begin the AI Fashion Analysis.")
+        # If no file is uploaded and no previous file is retained in session state,
+        # then clear everything and show welcome message.
+        if not st.session_state.uploaded_fashion_filename:
+            st.session_state.uploaded_fashion_filename = None
+            st.session_state.processed_fashion_image_bytes = None
+            st.session_state.fashion_analysis_results = None
+            st.session_state.annotated_image_bytes = None
+            st.session_state.smart_recommendations_results = None
+            st.info("👋 Welcome! Please upload an image to begin the AI Fashion Analysis.")
 
     # --- Display Results Section (Annotated Image and Item Details) ---
+    # These sections display if the relevant session state variables are populated,
+    # regardless of whether a file is currently in the uploader widget.
     if st.session_state.annotated_image_bytes:
         st.subheader("🖼️ Annotated Image with Detected Items")
         st.image(st.session_state.annotated_image_bytes, caption="Detected Fashion Items Highlighted", use_column_width=True)
@@ -578,10 +598,38 @@ def main_app():
         except Exception as e_csv:
             st.error(f"Error preparing CSV data for download: {e_csv}")
 
+        # This ensures the recommendations button only appears if there are fashion items.
+        if st.session_state.fashion_analysis_results and st.session_state.fashion_analysis_results.get("fashion_items"):
+            if st.button("💡 Get Smart Recommendations", key="get_recommendations_button"):
+                st.session_state.smart_recommendations_results = None
+                
+                recommendations_data = get_smart_recommendations(
+                    st.session_state.GEMINI_API_KEY,
+                    GEMINI_MODEL_NAME,
+                    st.session_state.fashion_analysis_results["fashion_items"]
+                )
+
+                if recommendations_data:
+                    st.session_state.smart_recommendations_results = recommendations_data
+                    st.success("Smart recommendations generated!")
+                else:
+                    st.error("Failed to generate smart recommendations. Please try again.")
+        else:
+            # This case should ideally not be reached if the outer 'if' holds
+            st.info("Please analyze fashion details first to get recommendations.")
+
     elif st.session_state.fashion_analysis_results and \
          not st.session_state.fashion_analysis_results.get("fashion_items") and \
          st.session_state.get('uploaded_fashion_filename'):
         st.info("AI analysis completed, but no fashion items were identified in the image to display details for.")
+
+    # --- Smart Recommendations Display ---
+    if st.session_state.get('smart_recommendations_results'):
+        st.subheader("💡 Smart Recommendations")
+        recommendations = st.session_state.smart_recommendations_results
+        st.markdown(f"**Complementary Suggestions**\n{recommendations.get('complementary_suggestions', 'N/A')}")
+        st.markdown(f"**Similar Styles You Might Like**\n{recommendations.get('similar_styles', 'N/A')}")
+        st.markdown(f"**Seasonal Styling Advice**\n{recommendations.get('seasonal_advice', 'N/A')}")
 
 if __name__ == '__main__':
     try:

@@ -9,7 +9,7 @@ from src.image_utils import process_image
 from src.data_exporters import convert_fashion_details_to_csv, convert_palette_to_csv, _flatten_colors_for_csv
 from src.ai_services import get_fashion_details_from_image, get_size_estimation_for_items, generate_fashion_copy, get_smart_recommendations
 from src.constants import MAX_IMAGE_SIZE, JPEG_QUALITY, TARGET_FORMAT 
-from src.constants import GEMINI_API_KEY, GEMINI_MODEL_NAME_VISION
+from src.constants import GEMINI_API_KEY, GEMINI_MODEL_NAME
 
 def create_dummy_image_bytes(width, height, img_format="PNG", mode="RGB"):
     img = Image.new(mode, (width, height), color="blue")
@@ -114,14 +114,14 @@ class TestCSVConverters(unittest.TestCase):
 class TestAIServices(unittest.TestCase):
     def test_get_fashion_details_from_image_parsing(self):
         dummy_image_bytes = create_dummy_image_bytes(50, 50)
-        result = get_fashion_details_from_image(dummy_image_bytes, GEMINI_API_KEY, GEMINI_MODEL_NAME_VISION)
+        result = get_fashion_details_from_image(dummy_image_bytes, GEMINI_API_KEY, GEMINI_MODEL_NAME)
         self.assertIsNotNone(result)
         self.assertIn("fashion_items", result)
         self.assertTrue(isinstance(result["fashion_items"], list))
 
     def test_get_fashion_details_invalid_json_response(self):
         dummy_image_bytes = create_dummy_image_bytes(50, 50)
-        result = get_fashion_details_from_image(dummy_image_bytes, GEMINI_API_KEY, GEMINI_MODEL_NAME_VISION)
+        result = get_fashion_details_from_image(dummy_image_bytes, GEMINI_API_KEY, GEMINI_MODEL_NAME)
         if GEMINI_API_KEY is None or GEMINI_API_KEY == "YOUR_ACTUAL_GEMINI_API_KEY_HERE":
             self.assertIsNone(result)
         else:
@@ -130,7 +130,7 @@ class TestAIServices(unittest.TestCase):
 
     def test_get_fashion_details_malformed_data_in_json(self):
         dummy_image_bytes = create_dummy_image_bytes(50, 50)
-        result = get_fashion_details_from_image(dummy_image_bytes, GEMINI_API_KEY, GEMINI_MODEL_NAME_VISION)
+        result = get_fashion_details_from_image(dummy_image_bytes, GEMINI_API_KEY, GEMINI_MODEL_NAME)
         if GEMINI_API_KEY is None or GEMINI_API_KEY == "YOUR_ACTUAL_GEMINI_API_KEY_HERE":
             self.assertIsNone(result)
         else:
@@ -141,14 +141,14 @@ class TestAIServices(unittest.TestCase):
 class TestNewAIServices(unittest.TestCase):
     def test_get_size_estimation_parsing(self):
         dummy_image_bytes = create_dummy_image_bytes(100,100)
-        result = get_size_estimation_for_items(dummy_image_bytes, GEMINI_API_KEY, GEMINI_MODEL_NAME_VISION)
+        result = get_size_estimation_for_items(dummy_image_bytes, GEMINI_API_KEY, GEMINI_MODEL_NAME)
         self.assertIsNotNone(result)
         self.assertIn("size_estimations", result)
         self.assertTrue(isinstance(result["size_estimations"], list))
 
     def test_get_size_estimation_empty_response(self):
         dummy_image_bytes = create_dummy_image_bytes(100,100)
-        result = get_size_estimation_for_items(dummy_image_bytes, GEMINI_API_KEY, GEMINI_MODEL_NAME_VISION)
+        result = get_size_estimation_for_items(dummy_image_bytes, GEMINI_API_KEY, GEMINI_MODEL_NAME)
         if GEMINI_API_KEY is None or GEMINI_API_KEY == "YOUR_ACTUAL_GEMINI_API_KEY_HERE":
             self.assertIsNone(result)
         else:
@@ -157,7 +157,7 @@ class TestNewAIServices(unittest.TestCase):
 
     def test_generate_fashion_copy_parsing(self):
         dummy_image_bytes = create_dummy_image_bytes(100,100)
-        result = generate_fashion_copy(dummy_image_bytes, GEMINI_API_KEY, GEMINI_MODEL_NAME_VISION)
+        result = generate_fashion_copy(dummy_image_bytes, GEMINI_API_KEY, GEMINI_MODEL_NAME)
         self.assertIsNotNone(result)
         self.assertIn("product_description", result)
         self.assertIn("styling_suggestions", result)
@@ -168,7 +168,7 @@ class TestNewAIServices(unittest.TestCase):
 
     def test_generate_fashion_copy_missing_keys(self):
         dummy_image_bytes = create_dummy_image_bytes(100,100)
-        result = generate_fashion_copy(dummy_image_bytes, GEMINI_API_KEY, GEMINI_MODEL_NAME_VISION)
+        result = generate_fashion_copy(dummy_image_bytes, GEMINI_API_KEY, GEMINI_MODEL_NAME)
         if GEMINI_API_KEY is None or GEMINI_API_KEY == "YOUR_ACTUAL_GEMINI_API_KEY_HERE":
             self.assertIsNone(result)
         else:
@@ -183,7 +183,7 @@ class TestNewAIServices(unittest.TestCase):
             {"item_name": "White T-Shirt", "category": "Topwear", "bounding_box": [0.2, 0.2, 0.6, 0.6],
              "dominant_colors": [{"hex_code": "#FFFFFF", "color_name": "White", "percentage": "100%"}]}
         ]
-        result = get_smart_recommendations(GEMINI_API_KEY, GEMINI_MODEL_NAME_VISION, sample_fashion_items)
+        result = get_smart_recommendations(GEMINI_API_KEY, GEMINI_MODEL_NAME, sample_fashion_items)
         self.assertIsNotNone(result)
         self.assertIn("complementary_suggestions", result)
         self.assertIn("similar_styles", result)
@@ -194,13 +194,56 @@ class TestNewAIServices(unittest.TestCase):
 
     def test_get_smart_recommendations_no_items(self):
         dummy_image_bytes = create_dummy_image_bytes(100,100)
-        result = get_smart_recommendations(GEMINI_API_KEY, GEMINI_MODEL_NAME_VISION, [])
+        result = get_smart_recommendations(GEMINI_API_KEY, GEMINI_MODEL_NAME, [])
         expected_result = {
             "complementary_suggestions": "No items were provided for recommendations.",
             "similar_styles": "No items were provided for recommendations.",
             "seasonal_advice": "No items were provided for recommendations."
         }
         self.assertEqual(result, expected_result)
+
+    def test_end_to_end_smart_recommendations(self):
+        # This test requires a valid GEMINI_API_KEY to run
+        if GEMINI_API_KEY is None or GEMINI_API_KEY == "YOUR_ACTUAL_GEMINI_API_KEY_HERE":
+            self.skipTest("GEMINI_API_KEY not set. Skipping end-to-end recommendation test.")
+
+        # 1. Load the real image
+        try:
+            with open("assets/silk_shirt.png", "rb") as f:
+                image_bytes = f.read()
+        except FileNotFoundError:
+            self.fail("assets/silk_shirt.png not found. Ensure the image exists at the specified path.")
+
+        # 2. Process the image
+        processed_image_bytes, _, process_msg = process_image(image_bytes, "silk_shirt.png")
+        self.assertIsNotNone(processed_image_bytes, f"Image processing failed: {process_msg}")
+
+        # 3. Get fashion details from the image using the actual AI service
+        fashion_details = get_fashion_details_from_image(
+            processed_image_bytes,
+            GEMINI_API_KEY,
+            GEMINI_MODEL_NAME
+        )
+        self.assertIsNotNone(fashion_details, "Fashion analysis failed or returned None.")
+        self.assertIn("fashion_items", fashion_details, "Fashion analysis result missing 'fashion_items' key.")
+        self.assertGreater(len(fashion_details["fashion_items"]), 0, "No fashion items detected by AI.")
+
+        # 4. Get smart recommendations using the detected fashion items
+        recommendations = get_smart_recommendations(
+            GEMINI_API_KEY,
+            GEMINI_MODEL_NAME,
+            fashion_details["fashion_items"]
+        )
+
+        # 5. Assert the recommendations are not the default "No items were provided"
+        self.assertIsNotNone(recommendations, "Smart recommendations failed or returned None.")
+        self.assertIn("complementary_suggestions", recommendations)
+        self.assertIn("similar_styles", recommendations)
+        self.assertIn("seasonal_advice", recommendations)
+
+        self.assertNotEqual(recommendations["complementary_suggestions"], "No items were provided for recommendations.")
+        self.assertNotEqual(recommendations["similar_styles"], "No items were provided for recommendations.")
+        self.assertNotEqual(recommendations["seasonal_advice"], "No items were provided for recommendations.")
 
 if __name__ == '__main__':
     unittest.main()

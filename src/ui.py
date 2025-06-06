@@ -119,12 +119,15 @@ def display_app():
                         else: st.error("Fashion text generation failed.")
 
                 with button_cols[3]: # Smart Recommendations (New)
-                    fashion_details_available = st.session_state.fashion_analysis_results_ui and st.session_state.fashion_analysis_results_ui.get("fashion_items")
+                    fashion_details_available = st.session_state.get('fashion_analysis_results_ui') and st.session_state.fashion_analysis_results_ui.get("fashion_items")
                     if st.button("💡 Get Recommendations", key="smart_recs_button_ui",
                                  disabled=not fashion_details_available,
                                  help="Suggest complementary items, similar styles, and seasonal advice. Requires fashion details to be analyzed first." ):
                         st.session_state.smart_recommendations_ui = None
-                        detected_items_for_recs = st.session_state.fashion_analysis_results_ui["fashion_items"]
+                        
+                        detected_items_for_recs = []
+                        if st.session_state.get('fashion_analysis_results_ui') and st.session_state.fashion_analysis_results_ui.get("fashion_items"):
+                            detected_items_for_recs = st.session_state.fashion_analysis_results_ui["fashion_items"]
 
                         with st.spinner("💡 Generating smart recommendations..."):
                             recs_results = get_smart_recommendations(
@@ -171,7 +174,13 @@ def display_app():
                             st.color_picker(f"{color.get('color_name', 'N/A')} ({color.get('percentage', '')})", value=hex_color_value, key=f"item_{i}_color_{j}_picker_ui", disabled=True)
                 else: st.write("No dominant colors specified for this item.")
         st.subheader("💾 Download Fashion Details")
-        base_fn = st.session_state.get('uploaded_fashion_filename_ui', 'fashion_analysis').rsplit('.', 1)[0]
+        # Retrieve filename, ensuring it's a string before splitting
+        current_filename = st.session_state.get('uploaded_fashion_filename_ui')
+        if current_filename is None:
+            base_fn = 'fashion_analysis'
+        else:
+            base_fn = current_filename.rsplit('.', 1)[0]
+
         try:
             json_export_data = export_to_json_string(results)
             if json_export_data: st.download_button(label="Download Details as JSON", data=json_export_data, file_name=f"{base_fn}_fashion_details.json", mime="application/json", key="download_fashion_json_ui")
