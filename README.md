@@ -4,6 +4,8 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-App-red)](https://streamlit.io/)
 
 ## USE LINK:- https://darzy-ai-assignment.streamlit.app/
+## Demo Video
+[![Watch the video](https://img.youtube.com/vi/gg6FRMdvt4w/0.jpg)](https://www.youtube.com/watch?v=gg6FRMdvt4w)
 
 ## Project Overview
 
