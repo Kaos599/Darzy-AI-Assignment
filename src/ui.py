@@ -26,8 +26,8 @@ from .database_manager import (
 
 def display_app():
     # Renders the Streamlit User Interface and orchestrates the application flow.
-    st.set_page_config(page_title="AI Fashion Analysis Pro", layout="wide")
-    st.title("AI Fashion Analysis Pro 🧥🎨")
+    st.set_page_config(page_title="Darzy's Fashion Agent", layout="wide")
+    st.title("Darzy's Fashion Agent 🧥🎨")
     st.markdown(
         "Upload an image to detect fashion items, estimate sizes, generate text, get recommendations, and more."
     )
@@ -61,7 +61,7 @@ def display_app():
             st.session_state.current_image_id = str(uuid.uuid4()) # Generate a new unique ID
             st.session_state.uploaded_file_name_display = uploaded_file.name
             print(f"DEBUG: New image uploaded: {uploaded_file.name}. New image ID: {st.session_state.current_image_id}")
-            st.success(f"New image '{uploaded_file.name}' uploaded. Processing...")
+            st.success(f"New image \'{uploaded_file.name}\' uploaded. Processing...")
             # For a new image, clear all displayed results from session state to avoid stale data
             st.session_state.fashion_analysis_results_ui = None
             st.session_state.annotated_image_bytes_ui = None
@@ -250,144 +250,143 @@ def display_app():
                             st.error("Smart recommendations generation failed or returned unexpected data.")
                     else:
                         st.info("Recommendations cannot be generated without detected fashion items (from DB). Please analyze fashion details first.")
-        else:
-            # Message if image is processed but API key is missing/invalid
-            if processed_image_bytes and not st.session_state.GEMINI_API_KEY:
-                st.warning("Please enter your Gemini API Key above to enable AI features.")
-            elif not processed_image_bytes:
-                 st.info("👋 Welcome! Please upload an image to begin.")
 
-    elif st.session_state.uploaded_file_name_display is None: # Initial state or after clearing all
-        st.info("👋 Welcome! Please upload an image to begin.")
+            # Display sections (after buttons so they can be cleared by button clicks)
+            print(f"DEBUG: Display section - current_image_id: {st.session_state.current_image_id}")
 
-    st.markdown("---")
-
-    # --- Display Results Section (Annotated Image and Item Details) ---
-    # Attempt to load all results from DB if image_id exists, otherwise use session state (for initial run before DB save)
-    current_image_id = st.session_state.get('current_image_id')
-
-    display_annotated_image = st.session_state.get('annotated_image_bytes_ui')
-    display_fashion_results = st.session_state.get('fashion_analysis_results_ui')
-    display_size_results = st.session_state.get('size_estimation_results_ui')
-    display_copy_results = st.session_state.get('fashion_copy_results_ui')
-    display_smart_recs_results = st.session_state.get('smart_recommendations_ui')
-
-    # If an image_id is present, try to load from DB for display
-    if current_image_id:
-        print(f"DEBUG: Display section - current_image_id: {current_image_id}")
-        if not display_fashion_results: # If not already loaded in session state, try DB
-            print(f"DEBUG: Loading fashion_details for display from DB for ID: {current_image_id}")
-            display_fashion_results = load_analysis_results(current_image_id, "fashion_details")
-            if display_fashion_results: print("DEBUG: Fashion details loaded for display from DB.")
-            else: print("DEBUG: Fashion details not found for display in DB.")
-
-            if display_fashion_results and display_fashion_results.get("fashion_items"):
-                # Re-generate annotated image if fashion details loaded from DB and not in session state
-                print(f"DEBUG: Loading image metadata for annotated image regeneration for ID: {current_image_id}")
-                img_metadata = load_image_metadata(current_image_id)
-                if img_metadata and "processed_image_b64" in img_metadata:
-                    p_img_bytes = base64.b64decode(img_metadata["processed_image_b64"])
-                    display_annotated_image = draw_detections_on_image(p_img_bytes, display_fashion_results)
-                    if display_annotated_image: print("DEBUG: Annotated image regenerated.")
-                    else: print("DEBUG: Failed to regenerate annotated image.")
+            # --- Display Fashion Details ---
+            # Load from DB if not already in session_state, or if image changed
+            if st.session_state.current_image_id and (st.session_state.fashion_analysis_results_ui is None or st.session_state.fashion_analysis_results_ui.get("_id") != st.session_state.current_image_id):
+                print(f"DEBUG: Loading fashion_details for display from DB for ID: {st.session_state.current_image_id}")
+                db_results = load_analysis_results(st.session_state.current_image_id, "fashion_details")
+                if db_results:
+                    st.session_state.fashion_analysis_results_ui = db_results
+                    st.session_state.annotated_image_bytes_ui = draw_detections_on_image(processed_image_bytes, db_results)
                 else:
-                    print("DEBUG: Processed image bytes not available for annotated image regeneration.")
+                    print("DEBUG: Fashion details not found for display in DB.")
+                    st.session_state.fashion_analysis_results_ui = None
+                    st.session_state.annotated_image_bytes_ui = None
 
-        if not display_size_results: # If not already loaded in session state, try DB
-            print(f"DEBUG: Loading size_estimation for display from DB for ID: {current_image_id}")
-            display_size_results = load_analysis_results(current_image_id, "size_estimation")
-            if display_size_results: print("DEBUG: Size estimation loaded for display from DB.")
-            else: print("DEBUG: Size estimation not found for display in DB.")
+            if st.session_state.annotated_image_bytes_ui:
+                st.subheader("Annotated Image")
+                st.image(st.session_state.annotated_image_bytes_ui, caption="Detected Fashion Items", use_container_width=True)
 
-        if not display_copy_results: # If not already loaded in session state, try DB
-            print(f"DEBUG: Loading fashion_copy for display from DB for ID: {current_image_id}")
-            display_copy_results = load_analysis_results(current_image_id, "fashion_copy")
-            if display_copy_results: print("DEBUG: Fashion copy loaded for display from DB.")
-            else: print("DEBUG: Fashion copy not found for display in DB.")
+            if st.session_state.fashion_analysis_results_ui and st.session_state.fashion_analysis_results_ui.get("fashion_items"):
+                fashion_items = st.session_state.fashion_analysis_results_ui["fashion_items"]
+                st.subheader("Detected Item Details")
+                for i, item in enumerate(fashion_items):
+                    with st.expander(f"Item {i+1}: {item.get('item_name', 'N/A')} ({item.get('category', 'N/A')})"):
+                        st.json(item) # Display raw JSON for debugging
+                        # Display colors visually
+                        if item.get("dominant_colors"):
+                            st.write("**Dominant Colors:**")
+                            color_cols = st.columns(3)
+                            for j, color in enumerate(item["dominant_colors"]):
+                                if j < 3: # Limit to 3 for visual display
+                                    color_cols[j].color_picker(f"Color {j+1}", color.get("hex_code", "#FFFFFF"), disabled=True)
+                                    color_cols[j].write(f"Name: {color.get('color_name', 'N/A')}")
+                                    color_cols[j].write(f"Percentage: {color.get('percentage', 'N/A')}")
 
-        if not display_smart_recs_results: # If not already loaded in session state, try DB
-            print(f"DEBUG: Loading smart_recommendations for display from DB for ID: {current_image_id}")
-            display_smart_recs_results = load_analysis_results(current_image_id, "smart_recommendations")
-            if display_smart_recs_results: print("DEBUG: Smart recommendations loaded for display from DB.")
-            else: print("DEBUG: Smart recommendations not found for display in DB.")
+                # Download Buttons
+                st.subheader("Download Fashion Details")
+                download_cols = st.columns(2)
+                # JSON Download
+                json_string = export_to_json_string(st.session_state.fashion_analysis_results_ui)
+                if json_string:
+                    download_cols[0].download_button(
+                        label="Download as JSON",
+                        data=json_string,
+                        file_name=f"{uploaded_file.name.rsplit('.', 1)[0]}_fashion_details.json",
+                        mime="application/json",
+                        key="download_json_ui"
+                    )
 
-    if display_annotated_image:
-        st.subheader("🖼️ Annotated Image")
-        st.image(display_annotated_image, caption="Detected Fashion Items", use_container_width=True)
+                # CSV Download
+                csv_string = convert_fashion_details_to_csv(st.session_state.fashion_analysis_results_ui)
+                if csv_string:
+                    download_cols[1].download_button(
+                        label="Download as CSV",
+                        data=csv_string,
+                        file_name=f"{uploaded_file.name.rsplit('.', 1)[0]}_fashion_details.csv",
+                        mime="text/csv",
+                        key="download_csv_ui"
+                    )
+            elif st.session_state.fashion_analysis_results_ui and not st.session_state.fashion_analysis_results_ui.get("fashion_items"):
+                st.info("No fashion items were detected in the image by the AI.")
 
-    if display_fashion_results and display_fashion_results.get("fashion_items"):
-        results = display_fashion_results
-        st.subheader("📋 Detected Item Details")
-        for i, item in enumerate(results["fashion_items"]):
-            with st.expander(f"Item {i+1}: {item.get('item_name', 'N/A')} ({item.get('category', 'N/A')})", expanded=True):
-                st.markdown(f"**Category:** {item.get('category', 'N/A')}")
-                st.markdown("**Dominant Colors (for this item):**")
-                item_dominant_colors = item.get("dominant_colors", [])
-                if item_dominant_colors:
-                    num_item_colors = len(item_dominant_colors)
-                    item_color_cols = st.columns(min(num_item_colors, 3))
-                    for j, color in enumerate(item_dominant_colors):
-                        if j >= 3: break
-                        with item_color_cols[j]:
-                            hex_color_value = color.get('hex_code', '#FFFFFF')
-                            if not (isinstance(hex_color_value, str) and hex_color_value.startswith('#') and len(hex_color_value) in [4, 7]):
-                                hex_color_value = '#FFFFFF'; st.caption("Invalid hex.")
-                            st.color_picker(f"{color.get('color_name', 'N/A')} ({color.get('percentage', '')})", value=hex_color_value, key=f"item_{i}_color_{j}_picker_ui", disabled=True)
-                else: st.write("No dominant colors specified for this item.")
-        st.subheader("💾 Download Fashion Details")
+            # --- Display Size Estimations ---
+            # Load from DB if not already in session_state, or if image changed
+            if st.session_state.current_image_id and (st.session_state.size_estimation_results_ui is None or st.session_state.size_estimation_results_ui.get("_id") != st.session_state.current_image_id):
+                print(f"DEBUG: Loading size_estimation for display from DB for ID: {st.session_state.current_image_id}")
+                db_results = load_analysis_results(st.session_state.current_image_id, "size_estimation")
+                if db_results:
+                    st.session_state.size_estimation_results_ui = db_results
+                else:
+                    print("DEBUG: Size estimation not found for display in DB.")
+                    st.session_state.size_estimation_results_ui = None
 
-        current_filename = st.session_state.get('uploaded_file_name_display')
-        if current_filename is None:
-            base_fn = 'fashion_analysis'
-        else:
-            base_fn = current_filename.rsplit('.', 1)[0]
+            if st.session_state.size_estimation_results_ui and st.session_state.size_estimation_results_ui.get("size_estimations"):
+                size_estimations = st.session_state.size_estimation_results_ui["size_estimations"]
+                st.subheader("📏 Size Estimations")
+                for i, estimation in enumerate(size_estimations):
+                    with st.expander(f"Estimate {i+1}: {estimation.get('item_description', 'N/A')}"):
+                        st.write(f"**Estimated Size:** {estimation.get('estimated_size', 'N/A')}")
+                        st.write(f"**Reasoning:** {estimation.get('reasoning', 'N/A')}")
+            elif st.session_state.size_estimation_results_ui and not st.session_state.size_estimation_results_ui.get("size_estimations"):
+                st.info("AI size estimation ran, but no estimates provided.")
 
-        try:
-            json_export_data = export_to_json_string(results)
-            if json_export_data: st.download_button(label="Download Details as JSON", data=json_export_data, file_name=f"{base_fn}_fashion_details.json", mime="application/json", key="download_fashion_json_ui")
-            else: st.error("Failed to prepare JSON for fashion details.")
-        except Exception as e: st.error(f"JSON export error (details): {e}")
-        try:
-            csv_export_data = convert_fashion_details_to_csv(results)
-            if csv_export_data: st.download_button(label="Download Details as CSV", data=csv_export_data, file_name=f"{base_fn}_fashion_details.csv", mime="text/csv", key="download_fashion_csv_ui")
-        except Exception as e: st.error(f"CSV export error (details): {e}")
+            # --- Display Fashion Copy ---
+            # Load from DB if not already in session_state, or if image changed
+            if st.session_state.current_image_id and (st.session_state.fashion_copy_results_ui is None or st.session_state.fashion_copy_results_ui.get("_id") != st.session_state.current_image_id):
+                print(f"DEBUG: Loading fashion_copy for display from DB for ID: {st.session_state.current_image_id}")
+                db_results = load_analysis_results(st.session_state.current_image_id, "fashion_copy")
+                if db_results:
+                    st.session_state.fashion_copy_results_ui = db_results
+                else:
+                    print("DEBUG: Fashion copy not found for display in DB.")
+                    st.session_state.fashion_copy_results_ui = None
 
-    elif display_fashion_results and not display_fashion_results.get("fashion_items") and st.session_state.get('uploaded_file_name_display'):
-        st.info("Fashion detail analysis completed, but no items were identified.")
+            if st.session_state.fashion_copy_results_ui and any(st.session_state.fashion_copy_results_ui.get(key) for key in ["product_description", "styling_suggestions", "social_media_caption"]):
+                st.subheader("✍️ AI Generated Fashion Text")
+                if st.session_state.fashion_copy_results_ui.get("product_description"):
+                    st.markdown("**Product Description:**")
+                    st.write(st.session_state.fashion_copy_results_ui["product_description"])
+                if st.session_state.fashion_copy_results_ui.get("styling_suggestions"):
+                    st.markdown("**Styling Suggestions:**")
+                    st.write(st.session_state.fashion_copy_results_ui["styling_suggestions"])
+                if st.session_state.fashion_copy_results_ui.get("social_media_caption"):
+                    st.markdown("**Social Media Caption:**")
+                    st.write(st.session_state.fashion_copy_results_ui["social_media_caption"])
+            elif st.session_state.fashion_copy_results_ui and not any(st.session_state.fashion_copy_results_ui.get(key) for key in ["product_description", "styling_suggestions", "social_media_caption"]):
+                st.info("AI did not generate any fashion text content.")
 
-    if display_size_results:
-        st.subheader("📏 Size Estimations")
-        estimations = display_size_results.get("size_estimations", [])
-        if not estimations: st.info("No specific size estimations were provided.")
-        else:
-            for i, est in enumerate(estimations):
-                with st.expander(f"Estimation for: {est.get('item_description', 'N/A')}", expanded=True):
-                    st.markdown(f"**Suggested Size:** {est.get('estimated_size', 'N/A')}")
-                    st.markdown(f"**Reasoning:** {est.get('reasoning', 'N/A')}")
+            # --- Display Smart Recommendations ---
+            # Load from DB if not already in session_state, or if image changed
+            if st.session_state.current_image_id and (st.session_state.smart_recommendations_ui is None or st.session_state.smart_recommendations_ui.get("_id") != st.session_state.current_image_id):
+                print(f"DEBUG: Loading smart_recommendations for display from DB for ID: {st.session_state.current_image_id}")
+                db_results = load_analysis_results(st.session_state.current_image_id, "smart_recommendations")
+                if db_results:
+                    st.session_state.smart_recommendations_ui = db_results
+                else:
+                    print("DEBUG: Smart recommendations not found for display in DB.")
+                    st.session_state.smart_recommendations_ui = None
 
-    if display_copy_results:
-        st.subheader("✍️ AI Generated Fashion Text")
-        copy_data = display_copy_results
-        if any(copy_data.get(key) for key in ["product_description", "styling_suggestions", "social_media_caption"]):
-            if copy_data.get("product_description"): st.markdown("#### Product Description"); st.markdown(copy_data["product_description"])
-            if copy_data.get("styling_suggestions"): st.markdown("#### Styling Suggestions"); st.markdown(copy_data["styling_suggestions"])
-            if copy_data.get("social_media_caption"): st.markdown("#### Social Media Caption"); st.markdown(copy_data["social_media_caption"])
-        else:
-            st.info("AI did not generate any specific text content for this image.")
+            if st.session_state.smart_recommendations_ui and any(st.session_state.smart_recommendations_ui.get(key) for key in ["complementary_suggestions", "similar_styles", "seasonal_advice"]):
+                st.subheader("💡 Smart Recommendations")
+                if st.session_state.smart_recommendations_ui.get("complementary_suggestions"):
+                    st.markdown("**Complementary Suggestions:**")
+                    st.write(st.session_state.smart_recommendations_ui["complementary_suggestions"])
+                if st.session_state.smart_recommendations_ui.get("similar_styles"):
+                    st.markdown("**Similar Styles:**")
+                    st.write(st.session_state.smart_recommendations_ui["similar_styles"])
+                if st.session_state.smart_recommendations_ui.get("seasonal_advice"):
+                    st.markdown("**Seasonal Styling Advice:**")
+                    st.write(st.session_state.smart_recommendations_ui["seasonal_advice"])
+            elif st.session_state.smart_recommendations_ui and not any(st.session_state.smart_recommendations_ui.get(key) for key in ["complementary_suggestions", "similar_styles", "seasonal_advice"]):
+                st.info("AI did not generate specific smart recommendations or encountered an issue.")
 
-    if display_smart_recs_results:
-        st.subheader("💡 Smart Recommendations")
-        recs_data = display_smart_recs_results
-        if any(recs_data.get(key) for key in ["complementary_suggestions", "similar_styles", "seasonal_advice"]):
-            if recs_data.get("complementary_suggestions"): st.markdown("#### Complementary Suggestions"); st.markdown(recs_data["complementary_suggestions"])
-            if recs_data.get("similar_styles"): st.markdown("#### Similar Styles You Might Like"); st.markdown(recs_data["similar_styles"])
-            if recs_data.get("seasonal_advice"): st.markdown("#### Seasonal Styling Advice"); st.markdown(recs_data["seasonal_advice"])
-        else:
-             st.info("AI did not generate any specific smart recommendations or encountered an issue processing the request.")
-
-    # Close MongoDB connection when app stops or session ends (optional, for explicit cleanup)
-    # This might need more sophisticated handling in a multi-user environment or deployed app.
-    # For local development, it's fine, but in cloud deployment, manage connections carefully.
-    # st.on_session_end(close_db_connection) # This is not officially supported / might cause issues.
+    # Footer
+    st.markdown("---")
+    st.markdown("Made by Harsh Dayal")
 
 # No if __name__ == '__main__': here
