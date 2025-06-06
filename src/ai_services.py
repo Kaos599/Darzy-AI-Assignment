@@ -58,7 +58,7 @@ class SmartRecommendationsResponse(BaseModel):
     seasonal_advice: str = Field(..., description="Brief tips on how the item could be styled for a particular season.")
 
 # --- Helper function for AI calls ---
-def _call_gemini_api(api_key: str, model_name: str, prompt_text: str, image_bytes: bytes = None, temperature: float = 0.3):
+def _call_gemini_api(api_key: str, model_name: str, prompt_text: str, image_bytes: bytes = None, temperature: float = 0.3, feature_name: str = "Unnamed Feature"):
     if not LANGCHAIN_AVAILABLE:
         print(f"ERROR: _call_gemini_api called but Langchain is not available.")
         return None
@@ -73,13 +73,13 @@ def _call_gemini_api(api_key: str, model_name: str, prompt_text: str, image_byte
 
         message = HumanMessage(content=messages_content)
 
-        print(f"INFO: Sending request to Gemini API for {model_name}...")
+        print(f"INFO: Sending request for '{feature_name}' to Gemini API for {model_name}...")
         response = llm.invoke([message])
-        print(f"INFO: Received response from Gemini API for {model_name}.")
+        print(f"INFO: Received response for '{feature_name}' from Gemini API for {model_name}.")
 
         return response.content.strip()
     except Exception as e:
-        print(f"ERROR: Failed to call Gemini API: {e}")
+        print(f"ERROR: Failed to call Gemini API for '{feature_name}': {e}")
         print(traceback.format_exc())
         return None
 
@@ -90,22 +90,8 @@ def get_fashion_details_from_image(image_bytes: bytes, api_key: str, model_name:
 
     parser = JsonOutputParser(pydantic_object=FashionDetailsResponse)
 
-    prompt_text = f"""Analyze the provided image and identify all distinct fashion items.
-For each detected fashion item, provide the following details in JSON format:
-1.  **item_name**: A concise descriptive name (e.g., "Blue Denim Shirt", "Leather Ankle Boots").
-2.  **category**: A general classification (e.g., "Topwear", "Footwear", "Accessory").
-3.  **bounding_box**: Normalized coordinates `[ymin, xmin, ymax, xmax]` defining the rectangular region where the item is located. Values must be between 0.0 and 1.0.
-4.  **dominant_colors**: A list of 1 to 3 objects, each describing a dominant color for *that specific item*. Each color object must contain:
-    *   **hex_code**: The color represented as a standard hexadecimal value (e.g., "#FF0000").
-    *   **color_name**: A common, human-readable name for the color (e.g., "Crimson Red", "Forest Green").
-    *   **percentage**: An estimated percentage representing how much of that color is present on that specific item (e.g., "70%").
-
-Return ONLY the JSON object conforming to the following Pydantic schema:
-{parser.get_format_instructions()}
-Ensure the bounding box coordinates are always valid (ymin < ymax, xmin < xmax) and within [0.0, 1.0].
-If no fashion items are detected, return an empty list for "fashion_items".
-"""
-    response_content = _call_gemini_api(api_key, model_name, prompt_text, image_bytes)
+    prompt_text = f"""Analyze the provided image and identify all distinct fashion items.\nFor each detected fashion item, provide the following details in JSON format:\n1.  **item_name**: A concise descriptive name (e.g., "Blue Denim Shirt", "Leather Ankle Boots").\n2.  **category**: A general classification (e.g., "Topwear", "Footwear", "Accessory").\n3.  **bounding_box**: Normalized coordinates `[ymin, xmin, ymax, xmax]` defining the rectangular region where the item is located. Values must be between 0.0 and 1.0.\n4.  **dominant_colors**: A list of 1 to 3 objects, each describing a dominant color for *that specific item*. Each color object must contain:\n    *   **hex_code**: The color represented as a standard hexadecimal value (e.g., "#FF0000").\n    *   **color_name**: A common, human-readable name for the color (e.g., "Crimson Red", "Forest Green").\n    *   **percentage**: An estimated percentage representing how much of that color is present on that specific item (e.g., "70%").\n\nReturn ONLY the JSON object conforming to the following Pydantic schema:\n{parser.get_format_instructions()}\nEnsure the bounding box coordinates are always valid (ymin < ymax, xmin < xmax) and within [0.0, 1.0].\nIf no fashion items are detected, return an empty list for "fashion_items".\n"""
+    response_content = _call_gemini_api(api_key, model_name, prompt_text, image_bytes, feature_name="Fashion Item Detection")
 
     if not response_content:
         return None
@@ -132,15 +118,8 @@ def get_size_estimation_for_items(image_bytes: bytes, api_key: str, model_name: 
     else:
         item_context_prompt = "Focus your size estimation on clearly visible garments in the image."
 
-    prompt_text = f"""Analyze the provided image to estimate sizes for wearable fashion garments.
-{item_context_prompt}
-
-Return ONLY the JSON object conforming to the following Pydantic schema:
-{parser.get_format_instructions()}
-If you cannot confidently estimate the size for any item, or if no suitable garments are visible, return an empty list for "size_estimations".
-Analyze garment proportions and any contextual clues visible. If a person is visible wearing the item, consider general human proportions but avoid making assumptions about the person's specific body measurements.
-"""
-    response_content = _call_gemini_api(api_key, model_name, prompt_text, image_bytes, temperature=0.3)
+    prompt_text = f"""Analyze the provided image to estimate sizes for wearable fashion garments.\n{item_context_prompt}\n\nReturn ONLY the JSON object conforming to the following Pydantic schema:\n{parser.get_format_instructions()}\nIf you cannot confidently estimate the size for any item, or if no suitable garments are visible, return an empty list for "size_estimations".\nAnalyze garment proportions and any contextual clues visible. If a person is visible wearing the item, consider general human proportions but avoid making assumptions about the person's specific body measurements.\n"""
+    response_content = _call_gemini_api(api_key, model_name, prompt_text, image_bytes, temperature=0.3, feature_name="Size Estimation")
 
     if not response_content:
         return None
@@ -175,16 +154,8 @@ def generate_fashion_copy(image_bytes: bytes, api_key: str, model_name: str, det
         if item_descriptions:
             item_context_prompt = f"The image contains the following detected fashion items: {'; '.join(item_descriptions)}. Generate content primarily focusing on these items or the overall look."
 
-    prompt_text = f"""
-{item_context_prompt}
-
-Return ONLY the JSON object conforming to the following Pydantic schema:
-{parser.get_format_instructions()}
-
-Ensure the generated text is creative, relevant to the visual information, and positive in tone.
-If the image does not clearly show fashion items or is inappropriate, return empty strings for all fields.
-"""
-    response_content = _call_gemini_api(api_key, model_name, prompt_text, image_bytes, temperature=0.7)
+    prompt_text = f"""\n{item_context_prompt}\n\nReturn ONLY the JSON object conforming to the following Pydantic schema:\n{parser.get_format_instructions()}\n\nEnsure the generated text is creative, relevant to the visual information, and positive in tone.\nIf the image does not clearly show fashion items or is inappropriate, return empty strings for all fields.\n"""
+    response_content = _call_gemini_api(api_key, model_name, prompt_text, image_bytes, temperature=0.7, feature_name="Fashion Copywriter")
 
     if not response_content:
         return None
@@ -224,15 +195,8 @@ def get_smart_recommendations(api_key: str, model_name: str, detected_items: lis
 
     items_context = "; ".join(item_descriptions)
 
-    prompt_text = f"""
-Based on the following detected fashion items: {items_context}, generate the following smart recommendations:
-
-Return ONLY the JSON object conforming to the following Pydantic schema:
-{parser.get_format_instructions()}
-
-Ensure the recommendations are creative, relevant to the fashion items, and helpful.
-"""
-    response_content = _call_gemini_api(api_key, model_name, prompt_text, temperature=0.5)
+    prompt_text = f"""\nBased on the following detected fashion items: {items_context}, generate the following smart recommendations:\n\nReturn ONLY the JSON object conforming to the following Pydantic schema:\n{parser.get_format_instructions()}\n\nEnsure the recommendations are creative, relevant to the fashion items, and helpful.\n"""
+    response_content = _call_gemini_api(api_key, model_name, prompt_text, temperature=0.5, feature_name="Smart Recommendations")
 
     if not response_content:
         return None
