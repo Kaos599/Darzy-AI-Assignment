@@ -1,63 +1,62 @@
 # AI Fashion Analysis Tool
 
+[![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-App-red)](https://streamlit.io/)
+
 ## Project Overview
 
-This application leverages AI to analyze images of fashion items. Users can upload an image, and the tool will detect individual fashion items, identify their categories, determine their dominant colors, and draw bounding boxes around them. The analysis results, including color palettes for each item, can be exported in JSON or CSV format.
+This application provides an AI-powered solution for analyzing fashion images. Users can upload an image, and the tool leverages advanced AI models to identify individual fashion items, categorize them, determine their dominant colors, and mark their locations with bounding boxes. Beyond core detection, it offers features like size estimation, AI-driven marketing copy generation, and smart styling recommendations. The comprehensive analysis results can be easily exported in both JSON and CSV formats.
 
-This project is structured into multiple Python files for better organization and maintainability.
+Our goal is to assist fashion professionals, e-commerce businesses, and enthusiasts in gaining deeper insights from visual fashion data.
 
 ## Features
 
-*   **Image Upload:** Supports uploading fashion images (JPG, JPEG, PNG, WEBP).
-*   **Image Processing:**
-    *   Automatic resizing for very large images while maintaining aspect ratio.
-    *   Conversion to a standard format (JPEG) optimized for AI model input.
-    *   Compression to reduce file size.
-    *   Error handling for invalid or corrupted image files.
-*   **AI-Powered Fashion Item Detection (via Google Gemini Pro Vision):**
-    *   Detects multiple distinct fashion items in the uploaded image.
-    *   For each detected item, it provides:
-        *   **Item Name:** A descriptive name (e.g., "Blue Denim Jacket").
-        *   **Category:** General type (e.g., "Outerwear", "Topwear", "Accessory").
-        *   **Bounding Box:** Coordinates defining the item's location in the image.
-        *   **Dominant Colors:** A specific color palette (HEX codes, color names, percentages) for that individual item.
-*   **Visual Feedback:** Displays the processed image with bounding boxes and labels overlaid on detected items.
-*   **Detailed Results Display:** Clearly lists each detected item and its properties, including its specific color palette, using an expandable interface.
-*   **Data Export:**
-    *   Download the complete, structured analysis results for all detected items as a **JSON** file.
-    *   Download a summary of detected items and their key features (including flattened color data) as a **CSV** file.
-*   **AI Size Estimation:** Suggests potential sizes for garments in the image with reasoning.
-*   **AI Fashion Copywriter:** Generates product descriptions, styling tips, and social media captions.
-*   **Smart Recommendations:** Provides suggestions for complementary items/colors, similar styles, and seasonal advice based on detected items.
+*   **Image Upload & Processing:** Supports common image formats (JPG, JPEG, PNG, WEBP). Images are automatically resized, converted to a consistent format (JPEG), and compressed for optimal AI processing while maintaining quality. Robust error handling is in place for invalid files.
+*   **AI-Powered Fashion Item Detection:** Utilizes Google Gemini Pro Vision to detect multiple distinct fashion items, providing their names, categories (e.g., "Outerwear", "Topwear"), bounding box coordinates, and a detailed palette of dominant colors (HEX, name, percentage) for each item.
+*   **Visual & Detailed Results:** Displays the processed image with AI-generated bounding boxes and labels. Comprehensive details for each detected item, including color palettes, are presented in an intuitive, expandable interface.
+*   **Data Export:** Allows downloading of complete, structured analysis results as a **JSON** file or a summarized, flattened view as a **CSV** file.
+*   **AI Size Estimation:** Provides potential size suggestions for garments based on visual cues and AI reasoning.
+*   **AI Fashion Copywriter:** Generates engaging product descriptions, practical styling tips, and catchy social media captions.
+*   **Smart Recommendations:** Offers AI-driven suggestions for complementary items/colors, similar styles, and seasonal advice, leveraging detected fashion items.
 
 ## Project Structure
 
-The project is organized as follows:
+The project is organized into logical directories for clarity and maintainability:
 
-aifashion/
+```
 ├── main.py                 # Main entry point to run the Streamlit app
+├── app.py                  # Core Streamlit application logic and UI components
 ├── requirements.txt        # Python dependencies
-├── README.md               # This file
-├── .env                    # For API keys (user-created, gitignored)
-│
-├── src/                    # Source code for the application
+├── README.md               # Project overview and setup instructions (this file)
+├── .env                    # Environment variables (e.g., API keys, gitignored)
+├── assets/                 # Static assets like example images
+├── docs/                   # Detailed project documentation (architecture, features, usage)
+│   ├── index.md
+│   ├── setup.md
+│   ├── usage.md
+│   ├── architecture.md
+│   ├── features_implemented.md
+│   └── future_enhancements.md
+├── src/                    # Source code for core application logic
 │   ├── __init__.py
 │   ├── ui.py               # Streamlit UI components and layout
 │   ├── image_utils.py      # Image processing functions
 │   ├── ai_services.py      # AI model interaction logic
 │   ├── data_exporters.py   # CSV/JSON conversion utilities
-│   └── constants.py        # Global application constants
-│
-└── tests/                  # Unit tests
+│   ├── constants.py        # Global application constants
+│   └── database_manager.py # Handles MongoDB interactions for persistence
+└── tests/                  # Unit tests for various modules
     ├── __init__.py
-    └── test_suite.py       # Main test suite
+    └── test_suite.py
+```
 
 ## Technologies Used
 
 *   **Programming Language:** Python 3.8+
-*   **Web Framework/UI:** Streamlit
-*   **AI Model Interaction:** Google Gemini Pro Vision API (via `langchain-google-genai`)
-*   **Image Processing:** Pillow (PIL)
+*   **Web Framework/UI:** [Streamlit](https://streamlit.io/)
+*   **AI Model Interaction:** [Google Gemini Pro Vision API](https://python.langchain.com/docs/integrations/llms/google_generative_ai) (via `langchain-google-genai`)
+*   **Image Processing:** [Pillow (PIL)](https://python-pillow.org/)
+*   **Database:** [MongoDB](https://www.mongodb.com/) (via `pymongo`)
 *   **Testing:** `unittest` (Python's built-in testing framework)
 *   **Environment Management:** `python-dotenv`
 
@@ -67,72 +66,68 @@ aifashion/
 
 *   Python 3.8 or newer.
 *   `pip` (Python package installer).
-*   `git` (for cloning, optional if you download the code directly).
+*   `git` (optional, for cloning the repository).
 
 ### 2. Clone the Repository (Optional)
 
-If you have git, you can clone the repository:
+If you have git, clone the repository:
 ```bash
-git clone <repository_url>
-cd aifashion  # Navigate into the project root
+git clone <repository_url> # Replace with your repository URL
+cd AI-Fashion-Analysis-Tool # Navigate into the project root directory
 ```
-Otherwise, download and extract the source code files into a directory named `aifashion`. Ensure all files and the `src` and `tests` subdirectories are correctly placed.
+If you don't use git, download the source code as a ZIP and extract it. Ensure the project structure matches the "Project Structure" section above.
 
 ### 3. Create a Virtual Environment (Recommended)
 
-From the project root directory (`aifashion/`):
+From the project root directory:
 ```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+# On Windows:
+.\venv\Scripts\activate
 ```
 
 ### 4. Install Dependencies
 
-Install the required Python packages using `requirements.txt` located in the project root:
+With your virtual environment activated:
 ```bash
 pip install -r requirements.txt
 ```
 
 ### 5. Set Environment Variables
 
-You need a Google Gemini API key for the AI analysis features.
+You need a Google Gemini API key and MongoDB connection details for AI analysis and data persistence.
 
-*   **Create a `.env` file:** In the project's root directory (`aifashion/`), create a file named `.env`.
-*   **Add your API key:** Inside the `.env` file, add your Gemini API key like this:
-    ```
+*   **Create a `.env` file:** In the project's root directory, create a file named `.env`.
+*   **Add your API key and MongoDB URI:**
+    ```env
     GEMINI_API_KEY="YOUR_ACTUAL_GEMINI_API_KEY_HERE"
+    # Optional: Specify a Gemini Vision model name if you don't want to use the default
+    # GEMINI_MODEL_NAME_VISION="gemini-pro-vision"
+
+    MONGO_URI="mongodb://localhost:27017/" # Or your MongoDB connection string
+    MONGO_DB_NAME="fashion_analysis_db"    # Your preferred database name
     ```
-    You can also optionally set `GEMINI_MODEL_NAME_VISION="your-preferred-gemini-vision-model"` if you want to override the default.
-The application (`main.py`) uses `python-dotenv` to load these variables. If `GEMINI_API_KEY` is not found, the application will prompt for it.
+The application will load these variables at startup. If `GEMINI_API_KEY` is not found, the app will prompt for it.
 
 ## Running the Application
 
-Ensure your virtual environment is activated and you are in the project root directory (`aifashion/`).
-Run the Streamlit application using:
+Ensure your virtual environment is activated and you are in the project root directory.
+Run the Streamlit application:
 
 ```bash
 streamlit run main.py
 ```
-
-This will typically open the application in your default web browser. If not, it will display a local URL (e.g., `http://localhost:8501`) that you can open manually.
+This will open the application in your default web browser (e.g., `http://localhost:8501`).
 
 ## Running Unit Tests
 
-From the project root directory (`aifashion/`), ensure your virtual environment is activated.
-Run the unit tests using:
+From the project root directory with your virtual environment activated:
 
 ```bash
 python -m unittest tests.test_suite
-```
-Alternatively, to discover all tests within the `tests` directory:
-```bash
-python -m unittest discover tests
+# Alternatively, to discover all tests in the tests directory:
+# python -m unittest discover tests
 ```
 
-## Interpreting Fashion Detection Results
-
-When you upload an image and run the analysis:
-
-*   **Annotated Image:** You'll see your uploaded image with colored boxes drawn around detected fashion items. Each box will have a label showing the item's name and category.
-*   **Detected Item Details:** Below the image, each detected item will be listed in an expandable section. You'll find its name, category, and specific dominant color palette.
-*   **Data Export:** You can download the analysis in JSON or CSV format.
