@@ -10,6 +10,7 @@ from src.data_exporters import convert_fashion_details_to_csv, convert_palette_t
 from src.ai_services import get_fashion_details_from_image, get_size_estimation_for_items, generate_fashion_copy, get_smart_recommendations
 from src.constants import MAX_IMAGE_SIZE, JPEG_QUALITY, TARGET_FORMAT 
 from src.constants import GEMINI_API_KEY, GEMINI_MODEL_NAME
+import src.database_manager as db_manager # Import the module directly
 
 def create_dummy_image_bytes(width, height, img_format="PNG", mode="RGB"):
     img = Image.new(mode, (width, height), color="blue")
@@ -247,3 +248,274 @@ class TestNewAIServices(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class TestDatabaseManager(unittest.TestCase):
+
+    @patch('src.database_manager.MongoClient')
+    @patch('src.database_manager.st') # Patch streamlit
+    @patch('src.database_manager.datetime') # Patch datetime
+    @patch('src.database_manager.uuid') # Patch uuid
+    def setUp(self, mock_uuid, mock_datetime, mock_st, mock_MongoClient):
+        # Directly patch module-level variables for database_manager
+        self.original_mongo_uri = db_manager.MONGO_URI
+        self.original_mongo_db_name = db_manager.MONGO_DB_NAME
+        self.original_image_collection = db_manager.MONGO_IMAGE_COLLECTION
+        self.original_analysis_collection = db_manager.MONGO_ANALYSIS_COLLECTION
+        self.original_recommendation_collection = db_manager.MONGO_RECOMMENDATION_COLLECTION
+        self.original_size_collection = db_manager.MONGO_SIZE_COLLECTION
+        self.original_copy_collection = db_manager.MONGO_COPY_COLLECTION
+
+        db_manager.MONGO_URI = "mongodb://mock_uri"
+        db_manager.MONGO_DB_NAME = "test_db"
+        db_manager.MONGO_IMAGE_COLLECTION = "test_images"
+        db_manager.MONGO_ANALYSIS_COLLECTION = "test_analysis"
+        db_manager.MONGO_RECOMMENDATION_COLLECTION = "test_recommendations"
+        db_manager.MONGO_SIZE_COLLECTION = "test_size"
+        db_manager.MONGO_COPY_COLLECTION = "test_copy"
+
+        # Mock datetime.now()
+        self.mock_now = MagicMock()
+        self.mock_now.return_value = "2023-01-01T12:00:00Z"
+        mock_datetime.now.return_value = self.mock_now.return_value
+
+        # Mock uuid.uuid4()
+        mock_uuid.uuid4.return_value = "mock_uuid_value"
+
+        # Mock MongoClient and its methods
+        self.mock_client_instance = mock_MongoClient.return_value
+        # Patch admin.command directly on the mock_client_instance
+        self.mock_client_instance.admin.command = MagicMock()
+
+        self.mock_db = self.mock_client_instance["test_db"]
+
+        self.mock_images_collection = self.mock_db["test_images"]
+        self.mock_analysis_collection = self.mock_db["test_analysis"]
+        self.mock_recommendation_collection = self.mock_db["test_recommendations"]
+        self.mock_size_collection = self.mock_db["test_size"]
+        self.mock_copy_collection = self.mock_db["test_copy"]
+
+        # Ensure _client in database_manager is None before each test
+        self.original_db_manager_client = None
+        if hasattr(db_manager, '_client'):
+            self.original_db_manager_client = db_manager._client
+        db_manager._client = None # Force re-initialization of MongoClient
+
+    @patch('src.database_manager.MongoClient')
+    @patch('src.database_manager.st') # Patch streamlit
+    def tearDown(self, mock_st, mock_MongoClient):
+        # Restore original module-level variables
+        db_manager.MONGO_URI = self.original_mongo_uri
+        db_manager.MONGO_DB_NAME = self.original_mongo_db_name
+        db_manager.MONGO_IMAGE_COLLECTION = self.original_image_collection
+        db_manager.MONGO_ANALYSIS_COLLECTION = self.original_analysis_collection
+        db_manager.MONGO_RECOMMENDATION_COLLECTION = self.original_recommendation_collection
+        db_manager.MONGO_SIZE_COLLECTION = self.original_size_collection
+        db_manager.MONGO_COPY_COLLECTION = self.original_copy_collection
+
+        # Restore original _client state in database_manager
+        if self.original_db_manager_client is not None:
+            db_manager._client = self.original_db_manager_client
+        # Ensure the client is truly closed for the next test run if it was set up
+        if db_manager._client:
+            db_manager._client.close()
+            db_manager._client = None
+
+    @patch('src.database_manager.MongoClient')
+    @patch('src.database_manager.st') # Patch streamlit
+    def test_get_database_connection(self, mock_st, mock_MongoClient):
+        # MONGO_URI is now directly patched in setUp
+        db = db_manager.get_database()
+        self.assertIsNotNone(db)
+        mock_MongoClient.assert_called_once_with(db_manager.MONGO_URI)
+        # Assert that admin.command was called on the instance returned by MongoClient
+        self.mock_client_instance.admin.command.assert_called_once_with('ismaster')
+        self.assertEqual(db.name, db_manager.MONGO_DB_NAME)
+
+    @patch('src.database_manager.MongoClient')
+    @patch('src.database_manager.st') # Patch streamlit
+    @patch('src.database_manager.datetime') # Patch datetime
+    def test_save_image_metadata(self, mock_datetime, mock_st, mock_MongoClient):
+        # MONGO_URI, MONGO_DB_NAME, etc. are now directly patched in setUp
+        # Configure mock_datetime.now()
+        mock_datetime.now.return_value = self.mock_now.return_value
+
+        # Mock the collection methods
+        mock_client = mock_MongoClient.return_value
+        mock_db = mock_client[db_manager.MONGO_DB_NAME]
+        mock_images_collection = mock_db[db_manager.MONGO_IMAGE_COLLECTION]
+        mock_images_collection.replace_one.return_value = MagicMock(matched_count=0, upserted_id="new_id")
+
+        image_id = "img123"
+        file_name = "test_image.jpg"
+        image_b64 = "base64string"
+
+        db_manager.save_image_metadata(image_id, file_name, image_b64)
+
+        mock_images_collection.replace_one.assert_called_once_with(
+            {"_id": image_id},
+            {
+                "_id": image_id,
+                "original_filename": file_name,
+                "processed_image_b64": image_b64,
+                "timestamp": self.mock_now.return_value # Use the mocked datetime
+            },
+            upsert=True
+        )
+
+    @patch('src.database_manager.MongoClient')
+    @patch('src.database_manager.st') # Patch streamlit
+    def test_load_image_metadata(self, mock_st, mock_MongoClient):
+        # MONGO_URI, MONGO_DB_NAME, etc. are now directly patched in setUp
+        mock_client = mock_MongoClient.return_value
+        mock_db = mock_client[db_manager.MONGO_DB_NAME]
+        mock_images_collection = mock_db[db_manager.MONGO_IMAGE_COLLECTION]
+        expected_data = {"_id": "img123", "original_filename": "test.jpg", "processed_image_b64": "abc", "timestamp": "2023-01-01T12:00:00Z"}
+        mock_images_collection.find_one.return_value = expected_data
+
+        result = db_manager.load_image_metadata("img123")
+
+        mock_images_collection.find_one.assert_called_once_with({"_id": "img123"})
+        self.assertEqual(result, expected_data)
+
+    @patch('src.database_manager.MongoClient')
+    @patch('src.database_manager.st') # Patch streamlit
+    def test_load_image_metadata_not_found(self, mock_st, mock_MongoClient):
+        # MONGO_URI, MONGO_DB_NAME, etc. are now directly patched in setUp
+        mock_client = mock_MongoClient.return_value
+        mock_db = mock_client[db_manager.MONGO_DB_NAME]
+        mock_images_collection = mock_db[db_manager.MONGO_IMAGE_COLLECTION]
+        mock_images_collection.find_one.return_value = None
+
+        result = db_manager.load_image_metadata("non_existent_id")
+
+        self.assertIsNone(result)
+
+    @patch('src.database_manager.MongoClient')
+    @patch('src.database_manager.st') # Patch streamlit
+    @patch('src.database_manager.datetime') # Patch datetime
+    @patch('src.database_manager.uuid') # Patch uuid
+    def test_save_analysis_results(self, mock_uuid, mock_datetime, mock_st, mock_MongoClient):
+        # MONGO_URI, MONGO_DB_NAME, etc. are now directly patched in setUp
+        # Configure mock_datetime.now()
+        mock_datetime.now.return_value = self.mock_now.return_value
+
+        # Configure mock_uuid.uuid4()
+        mock_uuid.uuid4.return_value = "mock_uuid_value"
+
+        mock_client = mock_MongoClient.return_value
+        mock_db = mock_client[db_manager.MONGO_DB_NAME]
+
+        # Test saving fashion_details
+        analysis_data_fd = {"fashion_items": [{"item": "shirt"}]}
+        mock_db[db_manager.MONGO_ANALYSIS_COLLECTION].replace_one.return_value = MagicMock(matched_count=0, upserted_id="new_id_fd")
+        db_manager.save_analysis_results("img1", analysis_data_fd, "fashion_details")
+        mock_db[db_manager.MONGO_ANALYSIS_COLLECTION].replace_one.assert_called_once_with(
+            {"_id": "img1"},
+            {
+                "_id": "img1",
+                "fashion_items": [{"item": "shirt"}],
+                "timestamp": self.mock_now.return_value,
+                "image_id": "img1"
+            },
+            upsert=True
+        )
+        mock_db[db_manager.MONGO_ANALYSIS_COLLECTION].replace_one.reset_mock() # Reset mock for next assertion
+
+        # Test saving size_estimation
+        analysis_data_se = {"size_estimations": [{"item": "pants"}]}
+        mock_db[db_manager.MONGO_SIZE_COLLECTION].replace_one.return_value = MagicMock(matched_count=0, upserted_id="new_id_se")
+        db_manager.save_analysis_results("img1", analysis_data_se, "size_estimation")
+        mock_db[db_manager.MONGO_SIZE_COLLECTION].replace_one.assert_called_once_with(
+            {"_id": "img1"},
+            {
+                "_id": "img1",
+                "size_estimations": [{"item": "pants"}],
+                "timestamp": self.mock_now.return_value,
+                "image_id": "img1"
+            },
+            upsert=True
+        )
+        mock_db[db_manager.MONGO_SIZE_COLLECTION].replace_one.reset_mock()
+
+        # Test saving fashion_copy
+        analysis_data_fc = {"product_description": "nice shirt"}
+        mock_db[db_manager.MONGO_COPY_COLLECTION].replace_one.return_value = MagicMock(matched_count=0, upserted_id="new_id_fc")
+        db_manager.save_analysis_results("img1", analysis_data_fc, "fashion_copy")
+        mock_db[db_manager.MONGO_COPY_COLLECTION].replace_one.assert_called_once_with(
+            {"_id": "img1"},
+            {
+                "_id": "img1",
+                "product_description": "nice shirt",
+                "timestamp": self.mock_now.return_value,
+                "image_id": "img1"
+            },
+            upsert=True
+        )
+        mock_db[db_manager.MONGO_COPY_COLLECTION].replace_one.reset_mock()
+
+        # Test saving smart_recommendations
+        analysis_data_sr = {"complementary_suggestions": "shoes"}
+        mock_db[db_manager.MONGO_RECOMMENDATION_COLLECTION].replace_one.return_value = MagicMock(matched_count=0, upserted_id="new_id_sr")
+        db_manager.save_analysis_results("img1", analysis_data_sr, "smart_recommendations")
+        mock_db[db_manager.MONGO_RECOMMENDATION_COLLECTION].replace_one.assert_called_once_with(
+            {"_id": "img1"},
+            {
+                "_id": "img1",
+                "complementary_suggestions": "shoes",
+                "timestamp": self.mock_now.return_value,
+                "image_id": "img1"
+            },
+            upsert=True
+        )
+        mock_db[db_manager.MONGO_RECOMMENDATION_COLLECTION].replace_one.reset_mock()
+
+    @patch('src.database_manager.MongoClient')
+    @patch('src.database_manager.st') # Patch streamlit
+    def test_load_analysis_results(self, mock_st, mock_MongoClient):
+        # MONGO_URI, MONGO_DB_NAME, etc. are now directly patched in setUp
+        mock_client = mock_MongoClient.return_value
+        mock_db = mock_client[db_manager.MONGO_DB_NAME]
+
+        # Test loading fashion_details
+        expected_fd_data = {"fashion_items": [{"item": "shirt"}]}
+        mock_db[db_manager.MONGO_ANALYSIS_COLLECTION].find_one.return_value = {"_id": "img1", "image_id": "img1", "type": "fashion_details", "data": expected_fd_data}
+        result_fd = db_manager.load_analysis_results("img1", "fashion_details")
+        self.assertEqual(result_fd, expected_fd_data)
+        mock_db[db_manager.MONGO_ANALYSIS_COLLECTION].find_one.assert_called_once_with({"image_id": "img1"})
+        mock_db[db_manager.MONGO_ANALYSIS_COLLECTION].find_one.reset_mock()
+
+        # Test loading size_estimation
+        expected_se_data = {"size_estimations": [{"item": "pants"}]}
+        mock_db[db_manager.MONGO_SIZE_COLLECTION].find_one.return_value = {"_id": "img1", "image_id": "img1", "type": "size_estimation", "data": expected_se_data}
+        result_se = db_manager.load_analysis_results("img1", "size_estimation")
+        self.assertEqual(result_se, expected_se_data)
+        mock_db[db_manager.MONGO_SIZE_COLLECTION].find_one.assert_called_once_with({"image_id": "img1"})
+        mock_db[db_manager.MONGO_SIZE_COLLECTION].find_one.reset_mock()
+
+        # Test loading fashion_copy
+        expected_fc_data = {"product_description": "nice shirt"}
+        mock_db[db_manager.MONGO_COPY_COLLECTION].find_one.return_value = {"_id": "img1", "image_id": "img1", "type": "fashion_copy", "data": expected_fc_data}
+        result_fc = db_manager.load_analysis_results("img1", "fashion_copy")
+        self.assertEqual(result_fc, expected_fc_data)
+        mock_db[db_manager.MONGO_COPY_COLLECTION].find_one.assert_called_once_with({"image_id": "img1"})
+        mock_db[db_manager.MONGO_COPY_COLLECTION].find_one.reset_mock()
+
+        # Test loading smart_recommendations
+        expected_sr_data = {"complementary_suggestions": "shoes"}
+        mock_db[db_manager.MONGO_RECOMMENDATION_COLLECTION].find_one.return_value = {"_id": "img1", "image_id": "img1", "type": "smart_recommendations", "data": expected_sr_data}
+        result_sr = db_manager.load_analysis_results("img1", "smart_recommendations")
+        self.assertEqual(result_sr, expected_sr_data)
+        mock_db[db_manager.MONGO_RECOMMENDATION_COLLECTION].find_one.assert_called_once_with({"image_id": "img1"})
+        mock_db[db_manager.MONGO_RECOMMENDATION_COLLECTION].find_one.reset_mock()
+
+    @patch('src.database_manager.MongoClient')
+    @patch('src.database_manager.st') # Patch streamlit
+    def test_load_analysis_results_not_found(self, mock_st, mock_MongoClient):
+        # MONGO_URI, MONGO_DB_NAME, etc. are now directly patched in setUp
+        mock_client = mock_MongoClient.return_value
+        mock_db = mock_client[db_manager.MONGO_DB_NAME]
+        mock_db[db_manager.MONGO_ANALYSIS_COLLECTION].find_one.return_value = None
+
+        result = db_manager.load_analysis_results("non_existent_id", "fashion_details")
+
+        self.assertIsNone(result)

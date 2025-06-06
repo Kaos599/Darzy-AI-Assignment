@@ -432,15 +432,7 @@ def main_app():
         if not st.session_state.GEMINI_API_KEY:
             st.session_state.GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-    if not st.session_state.GEMINI_API_KEY:
-        st.session_state.GEMINI_API_KEY = st.text_input(
-            "Enter your Google Gemini API Key:",
-            type="password",
-            help="Required for AI analysis. For local use, set GEMINI_API_KEY in a .env file. For Colab, use secrets."
-        )
-
-    GEMINI_MODEL_NAME = os.environ.get("GEMINI_MODEL_NAME")
-
+    # Initialize all necessary session state variables at the top
     if 'uploaded_fashion_filename' not in st.session_state:
         st.session_state.uploaded_fashion_filename = None
     if 'processed_fashion_image_bytes' not in st.session_state:
@@ -452,6 +444,18 @@ def main_app():
     if 'smart_recommendations_results' not in st.session_state:
         st.session_state.smart_recommendations_results = None
 
+    GEMINI_MODEL_NAME = os.environ.get("GEMINI_MODEL_NAME")
+
+    # Display API key input if not set
+    if not st.session_state.GEMINI_API_KEY:
+        st.session_state.GEMINI_API_KEY = st.text_input(
+            "Enter your Google Gemini API Key:",
+            type="password",
+            help="Required for AI analysis. For local use, set GEMINI_API_KEY in a .env file. For Colab, use secrets."
+        )
+        if not st.session_state.GEMINI_API_KEY:
+            st.warning("Please enter your Gemini API Key above to enable the AI-powered analysis features.")
+
     # --- File Upload Section ---
     uploaded_file = st.file_uploader(
         "1. Upload Fashion Image",
@@ -459,18 +463,20 @@ def main_app():
         key="file_uploader_main"
     )
 
+    # Logic for handling uploaded file and processing
     if uploaded_file is not None:
-        # Check if a new file has been uploaded or if the existing one was cleared
+        # Check if a new file has been uploaded (by name change or clearing)
         if st.session_state.uploaded_fashion_filename != uploaded_file.name:
-            # New file uploaded, clear previous analysis results
+            # New file uploaded, clear all previous analysis results
             st.session_state.uploaded_fashion_filename = uploaded_file.name
             st.session_state.processed_fashion_image_bytes = None
             st.session_state.fashion_analysis_results = None
             st.session_state.annotated_image_bytes = None
-            st.session_state.smart_recommendations_results = None # Clear recommendations too
+            st.session_state.smart_recommendations_results = None
             st.info("New image uploaded. Ready for processing and analysis.")
 
-        if not st.session_state.processed_fashion_image_bytes:
+        # Process image only if it hasn't been processed yet in the current session state
+        if st.session_state.processed_fashion_image_bytes is None:
             raw_image_bytes = uploaded_file.getvalue()
             with st.spinner("⚙️ Processing image... This may take a moment for larger files."):
                 p_img_data, _, p_msg = process_image(raw_image_bytes, uploaded_file.name)
@@ -487,46 +493,45 @@ def main_app():
                 st.session_state.annotated_image_bytes = None
                 st.session_state.smart_recommendations_results = None
                 return
+    elif st.session_state.processed_fashion_image_bytes is None: # No file uploaded AND no processed image in state
+        # Only clear and show welcome message if truly no image has been processed or is present
+        st.session_state.uploaded_fashion_filename = None
+        st.session_state.fashion_analysis_results = None
+        st.session_state.annotated_image_bytes = None
+        st.session_state.smart_recommendations_results = None
+        st.info("👋 Welcome! Please upload an image to begin the AI Fashion Analysis.")
 
-        # This block contains the buttons for AI analysis
-        if st.session_state.processed_fashion_image_bytes and st.session_state.GEMINI_API_KEY:
-            # Place the analysis button here, as it depends on processed image
-            if st.button("2. Analyze Fashion Details with AI ✨", key="analyze_fashion_button"):
-                st.session_state.fashion_analysis_results = None
-                st.session_state.annotated_image_bytes = None
-                st.session_state.smart_recommendations_results = None # Clear old recommendations on new analysis
-
-                analysis_data = get_fashion_details_from_image(
-                    st.session_state.processed_fashion_image_bytes,
-                    st.session_state.GEMINI_API_KEY,
-                    GEMINI_MODEL_NAME
-                )
-
-                if analysis_data:
-                    st.session_state.fashion_analysis_results = analysis_data
-                    if analysis_data.get("fashion_items"):
-                        st.success("Fashion analysis complete! Items detected.")
-                        with st.spinner("🎨 Generating annotated image with detected items..."):
-                            annotated_bytes = draw_detections_on_image(
-                                st.session_state.processed_fashion_image_bytes,
-                                analysis_data
-                            )
-                        if annotated_bytes:
-                            st.session_state.annotated_image_bytes = annotated_bytes
-                        else:
-                            st.warning("Could not generate the annotated image, but analysis data is available below.")
-                    else:
-                        st.info("AI analysis ran successfully, but no specific fashion items were detected or validated in this image.")
-    else:
-        # If no file is uploaded and no previous file is retained in session state,
-        # then clear everything and show welcome message.
-        if not st.session_state.uploaded_fashion_filename:
-            st.session_state.uploaded_fashion_filename = None
-            st.session_state.processed_fashion_image_bytes = None
+    # --- AI Analysis Buttons (displayed if an image is processed and API key is available) ---
+    if st.session_state.processed_fashion_image_bytes and st.session_state.GEMINI_API_KEY:
+        if st.button("2. Analyze Fashion Details with AI ✨", key="analyze_fashion_button"):
             st.session_state.fashion_analysis_results = None
             st.session_state.annotated_image_bytes = None
             st.session_state.smart_recommendations_results = None
-            st.info("👋 Welcome! Please upload an image to begin the AI Fashion Analysis.")
+
+            analysis_data = get_fashion_details_from_image(
+                st.session_state.processed_fashion_image_bytes,
+                st.session_state.GEMINI_API_KEY,
+                GEMINI_MODEL_NAME
+            )
+
+            if analysis_data:
+                st.session_state.fashion_analysis_results = analysis_data
+                # Debug print to inspect raw analysis_data from AI
+                print(f"DEBUG: Raw analysis_data from AI: {analysis_data.get("fashion_items", [])[:2]}") # Print first 2 items
+
+                if analysis_data.get("fashion_items"):
+                    st.success("Fashion analysis complete! Items detected.")
+                    with st.spinner("🎨 Generating annotated image with detected items..."):
+                        annotated_bytes = draw_detections_on_image(
+                            st.session_state.processed_fashion_image_bytes,
+                            analysis_data
+                        )
+                    if annotated_bytes:
+                        st.session_state.annotated_image_bytes = annotated_bytes
+                    else:
+                        st.warning("Could not generate the annotated image, but analysis data is available below.")
+                else:
+                    st.info("AI analysis ran successfully, but no specific fashion items were detected or validated in this image.")
 
     # --- Display Results Section (Annotated Image and Item Details) ---
     # These sections display if the relevant session state variables are populated,
