@@ -3,6 +3,8 @@
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-App-red)](https://streamlit.io/)
 
+## USE LINK:- https://darzy-ai-assignment.streamlit.app/
+
 ## Project Overview
 
 This application provides an AI-powered solution for analyzing fashion images. Users can upload an image, and the tool leverages advanced AI models to identify individual fashion items, categorize them, determine their dominant colors, and mark their locations with bounding boxes. Beyond core detection, it offers features like size estimation, AI-driven marketing copy generation, and smart styling recommendations. The comprehensive analysis results can be easily exported in both JSON and CSV formats.
