@@ -3,4 +3,5 @@ Pillow
 google-generativeai
 langchain
 langchain-google-genai
+langchain-google-vertexai
 python-dotenv

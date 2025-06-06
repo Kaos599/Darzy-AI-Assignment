@@ -29,27 +29,51 @@ The application interface is designed to be straightforward:
 *   Supported formats are JPG, JPEG, PNG, and WEBP.
 *   Once uploaded, the application will automatically process the image (resize, convert to JPEG, compress). A preview of the "Processed Image" will be displayed along with a status message about the processing.
 
-### Step 2: Analyze Fashion Details
-*   If the image is processed successfully and your Gemini API key is provided, a button labeled **"2. Analyze Fashion Details with AI ✨"** will become active.
-*   Click this button to send the processed image to the Google Gemini API for analysis. This may take a few moments; a spinner animation will indicate that analysis is in progress.
+### Step 2: Choose AI Analysis Feature(s)
+After the image is processed and if your API key is set, you'll see several buttons to trigger different AI analyses:
+
+*   **Analyze Fashion Details (👁️ Analyze Details):**
+    *   Click this button to perform the primary analysis: detecting items, their categories, colors, and drawing bounding boxes.
+    *   This is often the first AI step to run as other features can use its output as context.
+    *   Results include the **Annotated Image** and **Detected Item Details**.
+
+*   **Estimate Garment Sizes (📏 Estimate Sizes):**
+    *   Click this button to get size suggestions for garments in the image.
+    *   If "Analyze Fashion Details" was run first, its findings (e.g., item names) can provide context to this feature.
+    *   Results appear in the **"📏 Size Estimations"** section, showing item descriptions, estimated sizes, and reasoning.
+
+*   **Generate Fashion Text (✍️ Generate Text):**
+    *   Click this button to create AI-generated textual content.
+    *   Like size estimation, it can use context from "Analyze Fashion Details" if available.
+    *   Results appear in the **"✍️ AI Generated Fashion Text"** section, including a Product Description, Styling Suggestions, and a Social Media Caption.
+
+*   **Get Smart Recommendations (💡 Get Recommendations):**
+    *   This button is **enabled only after "Analyze Fashion Details" has successfully identified items.**
+    *   Click it to receive AI-powered advice based on the detected items.
+    *   Results appear in the **"💡 Smart Recommendations"** section, featuring Complementary Suggestions, Similar Styles, and Seasonal Styling Advice.
 
 ### Interpreting the Results
 
-Once the AI analysis is complete:
+Once an AI analysis is complete, the relevant results will be displayed:
 
 *   **Annotated Image:**
-    *   An **"Annotated Image with Detected Items"** section will appear, displaying your image with:
-        *   **Bounding Boxes:** Colored rectangles drawn around each detected fashion item.
-        *   **Labels:** Text labels next to each box showing the item's name and category (e.g., "Denim Jacket (Outerwear)"). The color of the box and label often corresponds to a dominant color of the item.
+    *   Appears after running "Analyze Fashion Details".
+    *   Shows your image with colored rectangles (bounding boxes) around detected fashion items and text labels (item name, category).
 *   **Detected Item Details:**
-    *   Below the annotated image, a section titled **"Detected Item Details"** will list each fashion item found by the AI.
-    *   Each item is presented in an expandable section (click the item's name to expand/collapse).
-    *   Inside each item's section, you'll find:
-        *   **Category:** The general category assigned by the AI.
-        *   **Dominant Colors (for this item):** A palette of 1-3 dominant colors specific to that item, shown as color swatches with their HEX codes, common names, and estimated percentages.
+    *   Appears after running "Analyze Fashion Details".
+    *   Lists each detected item in an expandable section, showing its category and a palette of its dominant colors (with swatches, HEX codes, names, percentages).
+*   **Size Estimations:**
+    *   Appears after running "Estimate Sizes".
+    *   Each estimation describes the item, suggests a size, and provides the AI's reasoning.
+*   **AI Generated Fashion Text:**
+    *   Appears after running "Generate Fashion Text".
+    *   Displays the AI-crafted product description, styling suggestions, and social media caption.
+*   **Smart Recommendations:**
+    *   Appears after running "Get Recommendations".
+    *   Shows suggestions for complementary items/colors, similar styles, and seasonal advice based on the initially detected items.
 
-### Step 3: Download Full Analysis
-*   If the AI analysis was successful and items were detected, a **"3. Download Full Analysis"** section will appear.
+### Step 3: Download Full Analysis (Fashion Details)
+*   If the "Analyze Fashion Details" step was successful and items were detected, a **"Download Fashion Details"** section will appear under the item details.
 *   **Download Details as JSON:** Click this button to download a JSON file containing the complete structured data for all detected items (names, categories, bounding boxes, full per-item color palettes). The filename will be based on your original image's name (e.g., `yourimage_fashion_details.json`).
 *   **Download Details as CSV:** Click this button to download a CSV file. This file provides a tabular summary of the detected items, including their names, categories, bounding box coordinates, and flattened details for their dominant colors. The filename will also be based on your original image's name (e.g., `yourimage_fashion_details.csv`).
 
